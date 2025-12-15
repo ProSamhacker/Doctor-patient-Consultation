@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "764744109475",
+    "firebase_url": "https://andriod-project-8efe5-default-rtdb.firebaseio.com",
+    "project_id": "andriod-project-8efe5",
+    "storage_bucket": "andriod-project-8efe5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:764744109475:android:1382fcc811df1a863d1e16",
+        "android_client_info": {
+          "package_name": "com.example.hospitalmanagement"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "764744109475-6cgci49mp1vjh6favl4779luueed05k8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDd4JrLbTA8sQA-SxaMsKnAmpJHbm6vvJw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "764744109475-6cgci49mp1vjh6favl4779luueed05k8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -41,7 +41,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)     
         userRole = intent.getStringExtra("USER_ROLE") ?: "PATIENT"
         userId = intent.getStringExtra("USER_ID") ?: if (userRole == "DOCTOR") "DOC001" else "PAT001"
 

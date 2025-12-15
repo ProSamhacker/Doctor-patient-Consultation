@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FAFAFA"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
+        
+        <ImageView
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:src="@drawable/circle_background"
+            app:tint="#D32F2F"/> <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Recording Live Session..."
+            android:textColor="#D32F2F"
+            android:textStyle="bold"
+            android:layout_marginStart="8dp"/>
+            
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"/>
+            
+        <TextView
+            android:id="@+id/tvTimer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:14"
+            android:textSize="18sp"/>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_marginVertical="32dp"
+        android:background="#E3F2FD"/> <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Detected Medical Entites"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"/>
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/chipGroupEntities"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        
+        <com.google.android.material.chip.Chip
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Symptom: Fever"
+            android:textColor="@color/white"
+            app:chipBackgroundColor="#EF5350"/>
+
+        <com.google.android.material.chip.Chip
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Duration: 3 Days"
+            android:textColor="@color/white"
+            app:chipBackgroundColor="#42A5F5"/>
+    </com.google.android.material.chip.ChipGroup>
+
+    <TextView
+        android:id="@+id/tvTranscriptPreview"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="24dp"
+        android:text="..."
+        android:textSize="16sp"
+        android:textColor="#666"
+        android:gravity="bottom"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnStopAndVerify"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Stop &amp; Verify Prescription"
+        android:textSize="16sp"
+        app:icon="@drawable/ic_check"
+        app:iconGravity="textStart"
+        android:backgroundTint="#1976D2"
+        app:cornerRadius="30dp"/>
+
+</LinearLayout>

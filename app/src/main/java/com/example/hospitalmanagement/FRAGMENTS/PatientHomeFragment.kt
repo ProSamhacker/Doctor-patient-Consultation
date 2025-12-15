@@ -7,6 +7,7 @@ import android.speech.tts.TextToSpeech
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -15,21 +16,22 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.hospitalmanagement.ADAPTER.PrescriptionPatientAdapter
 import com.example.hospitalmanagement.MainViewModel
 import com.example.hospitalmanagement.R
 import com.example.hospitalmanagement.VoiceRecognitionService
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.launch
 import java.util.Locale
 
 class PatientHomeFragment : Fragment(), TextToSpeech.OnInitListener {
     private lateinit var viewModel: MainViewModel
-    private lateinit var rvPrescriptions: RecyclerView
-    private lateinit var adapter: PrescriptionPatientAdapter
     private lateinit var tts: TextToSpeech
     private var voiceService: VoiceRecognitionService? = null
+    
+    // UI Elements
+    private var btnReadPrescription: MaterialButton? = null
+    private var fabMicPatient: FloatingActionButton? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -38,19 +40,40 @@ class PatientHomeFragment : Fragment(), TextToSpeech.OnInitListener {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_patient_home, container, false)
 
-        rvPrescriptions = view.findViewById(R.id.rvPrescriptions)
-        rvPrescriptions.layoutManager = LinearLayoutManager(requireContext())
-
-        tts = TextToSpeech(requireContext(), this)
-        adapter = PrescriptionPatientAdapter(emptyList(), tts)
-        rvPrescriptions.adapter = adapter
-
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
+        tts = TextToSpeech(requireContext(), this)
+        
+        // Initialize Views
+        btnReadPrescription = view.findViewById(R.id.btnReadPrescription)
+        fabMicPatient = view.findViewById(R.id.fabMicPatient)
 
+        setupButtons()
         setupVoiceService()
         observeData()
 
         return view
+    }
+    
+    private fun setupButtons() {
+        // 1. Read Aloud Button
+        btnReadPrescription?.setOnClickListener {
+            // Hardcoded for the prototype demo
+            val textToRead = "Your daily medications are: 8 AM, Amoxicillin 500mg, take with food. 2 PM, Paracetamol, take if fever persists."
+            speakOut(textToRead)
+        }
+
+        // 2. Mic Button (Layman Translator)
+        fabMicPatient?.setOnClickListener {
+             openLaymanTranslator()
+        }
+    }
+
+    private fun speakOut(text: String) {
+        if (::tts.isInitialized) {
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "")
+        } else {
+            Toast.makeText(context, "Voice not ready yet", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun setupVoiceService() {
@@ -79,7 +102,7 @@ class PatientHomeFragment : Fragment(), TextToSpeech.OnInitListener {
     private fun showLaymanDialog() {
         AlertDialog.Builder(requireContext())
             .setTitle("🎤 Layman Translator")
-            .setMessage("Ask me to explain any medical term in simple language.\n\nFor example:\n• What does hypertension mean?\n• Explain diabetes\n• What is an MRI?")
+            .setMessage("Ask me to explain any medical term.\n\nExample: 'What is hypertension?'")
             .setPositiveButton("Ask Now") { _, _ ->
                 startListeningForQuery()
             }
@@ -88,37 +111,34 @@ class PatientHomeFragment : Fragment(), TextToSpeech.OnInitListener {
     }
 
     private fun startListeningForQuery() {
-        Toast.makeText(context, "Listening... Ask your question", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Listening...", Toast.LENGTH_SHORT).show()
         voiceService?.startListening()
     }
 
     private fun handleLaymanQuery(query: String) {
         activity?.runOnUiThread {
-            val dialog = AlertDialog.Builder(requireContext())
-                .setTitle("Processing...")
-                .setMessage("You asked: \"$query\"\n\nGetting explanation...")
+            // Show loading dialog
+            val loadingDialog = AlertDialog.Builder(requireContext())
+                .setTitle("Thinking...")
+                .setMessage("You asked: \"$query\"")
                 .setCancelable(false)
                 .create()
             
-            dialog.show()
+            loadingDialog.show()
 
             lifecycleScope.launch {
                 try {
                     viewModel.getLaymanExplanation(query) { explanation ->
                         activity?.runOnUiThread {
-                            dialog.dismiss()
+                            loadingDialog.dismiss()
                             showExplanationDialog(query, explanation)
-                            voiceService?.speak(explanation)
+                            speakOut(explanation)
                         }
                     }
                 } catch (e: Exception) {
                     activity?.runOnUiThread {
-                        dialog.dismiss()
-                        Toast.makeText(
-                            context,
-                            "Failed to get explanation: ${e.message}",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        loadingDialog.dismiss()
+                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -128,26 +148,14 @@ class PatientHomeFragment : Fragment(), TextToSpeech.OnInitListener {
     private fun showExplanationDialog(query: String, explanation: String) {
         AlertDialog.Builder(requireContext())
             .setTitle("💡 Simple Explanation")
-            .setMessage("Question: $query\n\nAnswer: $explanation")
-            .setPositiveButton("Got it", null)
-            .setNeutralButton("Ask Another") { _, _ ->
-                startListeningForQuery()
-            }
-            .setNegativeButton("Read Again") { _, _ ->
-                voiceService?.speak(explanation)
-            }
+            .setMessage("Q: $query\n\nA: $explanation")
+            .setPositiveButton("Close", null)
             .show()
     }
 
     private fun observeData() {
-        viewModel.prescriptions.observe(viewLifecycleOwner) { prescriptions ->
-            adapter.updateData(prescriptions)
-        }
-
         viewModel.currentPatient.observe(viewLifecycleOwner) { patient ->
-            patient?.let {
-                view?.findViewById<TextView>(R.id.tvPatientName)?.text = "Hi, ${it.name}"
-            }
+            // Update UI with patient name if needed
         }
     }
 
@@ -158,18 +166,11 @@ class PatientHomeFragment : Fragment(), TextToSpeech.OnInitListener {
     }
 
     private fun checkPermissions(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            requireContext(),
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun requestPermissions() {
-        ActivityCompat.requestPermissions(
-            requireActivity(),
-            arrayOf(Manifest.permission.RECORD_AUDIO),
-            PERMISSION_REQUEST_CODE
-        )
+        ActivityCompat.requestPermissions(requireActivity(), arrayOf(Manifest.permission.RECORD_AUDIO), PERMISSION_REQUEST_CODE)
     }
 
     override fun onDestroy() {

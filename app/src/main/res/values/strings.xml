@@ -3,7 +3,7 @@
     <string name="speak_command_description">Speak a voice command</string>
     <string name="stop_response_description">Stop the assistant from speaking</string>
     <string name="add_medication_manually">Add medication manually</string>
-
+    <string name="default_web_client_id">764744109475-6cgci49mp1vjh6favl4779luueed05k8.apps.googleusercontent.com</string>
     <!-- Strings for the manual add dialog -->
     <string name="add_new_medication_title">Add New Medication</string>
     <string name="medication_name_hint">Medication Name</string>

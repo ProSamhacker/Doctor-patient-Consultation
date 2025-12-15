@@ -6,9 +6,11 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog // Added Import
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -16,6 +18,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.hospitalmanagement.AppointmentStatus
 import com.example.hospitalmanagement.MainViewModel
+import com.example.hospitalmanagement.MedicalExtractionResult // Ensure this data class is available
 import com.example.hospitalmanagement.R
 import com.example.hospitalmanagement.VoiceRecognitionService
 import kotlinx.coroutines.launch
@@ -64,7 +67,7 @@ class DoctorHomeFragment : Fragment() {
             onError = { error ->
                 activity?.runOnUiThread {
                     tvStatus?.text = error
-                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                    // Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
                     updateMicButton(false)
                 }
             }
@@ -90,23 +93,20 @@ class DoctorHomeFragment : Fragment() {
     }
 
     private fun startConsultationSession() {
-        // Start a new consultation session
         viewModel.startConsultation(1) // Using dummy appointment ID
         currentSessionTranscript.clear()
         isRecordingSession = true
         
         updateMicButton(true)
-        tvStatus?.text = "Recording Session - Tap to continue"
-        tvLiveTranscript?.text = "Session started. Speak naturally during the consultation..."
+        tvStatus?.text = "Recording Session..."
+        tvLiveTranscript?.text = "Listening..."
         
-        // Start listening
         startListening()
     }
 
     private fun startListening() {
         if (isRecordingSession) {
             voiceService?.startListening()
-            tvStatus?.text = "Listening..."
             updateMicButton(true)
         }
     }
@@ -115,32 +115,28 @@ class DoctorHomeFragment : Fragment() {
         isRecordingSession = false
         voiceService?.stopListening()
         updateMicButton(false)
-        tvStatus?.text = "Processing consultation..."
+        tvStatus?.text = "Processing..."
         
         val transcript = currentSessionTranscript.toString()
         if (transcript.isNotBlank()) {
             processConsultation(transcript)
         } else {
             tvStatus?.text = "No content recorded"
-            tvLiveTranscript?.text = "Tap the mic to start a new session..."
         }
     }
 
     private fun handleVoiceResult(text: String) {
         activity?.runOnUiThread {
-            // Add to transcript
             if (currentSessionTranscript.isNotEmpty()) {
                 currentSessionTranscript.append(" ")
             }
             currentSessionTranscript.append(text)
             
-            // Update UI
             updateTranscript(currentSessionTranscript.toString())
             viewModel.addToTranscript(text)
             
-            // Continue listening if session is active
             if (isRecordingSession) {
-                // Small delay before next listening cycle
+                // Delay to restart listening (simulating continuous listening)
                 btnMic?.postDelayed({
                     if (isRecordingSession) {
                         startListening()
@@ -153,101 +149,81 @@ class DoctorHomeFragment : Fragment() {
     private fun processConsultation(transcript: String) {
         lifecycleScope.launch {
             try {
-                tvStatus?.text = "Analyzing with AI..."
+                tvStatus?.text = "AI Analyzing..."
                 
+                // Use ViewModel instead of direct Repository
                 viewModel.extractMedicalInfo(transcript) { result ->
                     activity?.runOnUiThread {
-                        val summary = buildString {
-                            append("✅ Consultation Analysis Complete\n\n")
-                            append("Symptoms: ${result.symptoms}\n\n")
-                            append("Diagnosis: ${result.diagnosis}\n\n")
-                            append("Severity: ${result.severity}\n\n")
-                            append("Medications: ${result.medications.size} prescribed\n\n")
-                            if (result.labTests.isNotEmpty()) {
-                                append("Tests: ${result.labTests.joinToString(", ")}\n\n")
-                            }
-                            append("Instructions: ${result.instructions}")
-                        }
-                        
-                        updateTranscript(summary)
-                        tvStatus?.text = "Tap mic to start new session"
-                        
-                        // Show success message
-                        Toast.makeText(
-                            context,
-                            "Consultation processed successfully",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        
-                        // Speak summary
-                        voiceService?.speak("Consultation analysis complete. ${result.diagnosis}")
+                        showPrescriptionDialog(result)
+                        tvStatus?.text = "Analysis Complete"
                     }
                 }
             } catch (e: Exception) {
                 activity?.runOnUiThread {
                     tvStatus?.text = "Error: ${e.message}"
-                    Toast.makeText(context, "Failed to process", Toast.LENGTH_SHORT).show()
                 }
             }
         }
     }
 
-    fun updateTranscript(text: String) {
-        tvLiveTranscript?.text = if (text.isBlank()) {
-            "Tap the mic below to start a consultation session..."
-        } else {
-            text
+    private fun showPrescriptionDialog(data: MedicalExtractionResult) {
+        // Inflate the custom dialog layout
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_medication, null)
+        
+        val etDiagnosis = dialogView.findViewById<EditText>(R.id.etDiagnosis)
+        val etMedication = dialogView.findViewById<EditText>(R.id.etMedicationName)
+        // Check if these IDs exist in your dialog_add_medication.xml. 
+        // If not, you might need to adjust the IDs here or in the XML.
+
+        // Auto-fill fields from AI result
+        etDiagnosis?.setText(data.diagnosis)
+        // Take the first medication if available
+        if (data.medications.isNotEmpty()) {
+            etMedication?.setText(data.medications[0].name)
         }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("🤖 AI Auto-Draft")
+            .setView(dialogView)
+            .setPositiveButton("Verify & Send") { _, _ ->
+                // Save logic here (e.g., viewModel.createPrescription(...))
+                Toast.makeText(context, "Prescription Sent!", Toast.LENGTH_SHORT).show()
+                updateTranscript("Prescription sent for: ${data.diagnosis}")
+            }
+            .setNegativeButton("Edit", null)
+            .show()
+    }
+
+    fun updateTranscript(text: String) {
+        tvLiveTranscript?.text = text.ifBlank { "Tap mic to start..." }
     }
 
     private fun updateMicButton(isActive: Boolean) {
         if (isActive) {
-            btnMic?.setColorFilter(
-                ContextCompat.getColor(requireContext(), android.R.color.holo_red_light)
-            )
+            btnMic?.setColorFilter(ContextCompat.getColor(requireContext(), android.R.color.holo_red_light))
             btnMic?.setImageResource(R.drawable.ic_stop)
         } else {
-            btnMic?.setColorFilter(
-                ContextCompat.getColor(requireContext(), android.R.color.white)
-            )
+            btnMic?.setColorFilter(ContextCompat.getColor(requireContext(), android.R.color.white))
             btnMic?.setImageResource(R.drawable.ic_mic)
         }
     }
 
     private fun observeData() {
         viewModel.currentDoctor.observe(viewLifecycleOwner) { doctor ->
-            doctor?.let { 
-                tvDoctorName?.text = it.name 
-            }
+            doctor?.let { tvDoctorName?.text = it.name }
         }
-
         viewModel.upcomingAppointments.observe(viewLifecycleOwner) { appointments ->
-            val scheduledCount = appointments.count { 
-                it.status == AppointmentStatus.SCHEDULED 
-            }
-            tvScheduleCount?.text = "$scheduledCount Appointments Remaining"
-        }
-
-        viewModel.consultationTranscript.observe(viewLifecycleOwner) { transcript ->
-            if (transcript.isNotBlank() && !isRecordingSession) {
-                updateTranscript(transcript)
-            }
+            val count = appointments.count { it.status == AppointmentStatus.SCHEDULED }
+            tvScheduleCount?.text = "$count Appointments Remaining"
         }
     }
 
     private fun checkPermissions(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            requireContext(),
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun requestPermissions() {
-        ActivityCompat.requestPermissions(
-            requireActivity(),
-            arrayOf(Manifest.permission.RECORD_AUDIO),
-            PERMISSION_REQUEST_CODE
-        )
+        ActivityCompat.requestPermissions(requireActivity(), arrayOf(Manifest.permission.RECORD_AUDIO), PERMISSION_REQUEST_CODE)
     }
 
     override fun onDestroyView() {

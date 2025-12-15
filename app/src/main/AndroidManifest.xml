@@ -20,18 +20,26 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Hospitalmanagement">
 
-        <activity
-            android:name=".RoleSelectionActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+      <activity
+        android:name=".auth.AuthActivity"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+    </activity>
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="false" />
+    <activity
+        android:name=".auth.RoleSelectionActivity"
+        android:exported="false"/>
+
+    <activity
+        android:name=".auth.ProfileSetupActivity"
+        android:exported="false"/>
+
+    <activity
+        android:name=".MainActivity"
+        android:exported="false" />
 
     </application>
 

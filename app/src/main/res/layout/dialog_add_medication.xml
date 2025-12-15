@@ -9,32 +9,37 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/add_new_medication_title"
+        android:text="Review Prescription"
         android:textColor="@android:color/black"
         android:textSize="20sp"
         android:textStyle="bold" />
 
     <EditText
-        android:id="@+id/etMedicationName"
+        android:id="@+id/etDiagnosis"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:hint="@string/medication_name_hint"
+        android:hint="Diagnosis (e.g., Viral Fever)"
+        android:inputType="textCapSentences"
+        android:minHeight="48dp" />
+
+    <EditText
+        android:id="@+id/etMedicationName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="Medication Name"
         android:inputType="textCapWords"
         android:minHeight="48dp"
-        android:autofillHints="name"
-        tools:ignore="VisualLintTextFieldSize" />
+        android:autofillHints="name" />
 
     <EditText
         android:id="@+id/etMedicationSection"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:hint="@string/section_hint"
+        android:hint="Instructions / Section"
         android:inputType="textCapWords"
-        android:minHeight="48dp"
-        android:autofillHints="postalAddress"
-        tools:ignore="VisualLintTextFieldSize" />
+        android:minHeight="48dp" />
 
 </LinearLayout>
-
