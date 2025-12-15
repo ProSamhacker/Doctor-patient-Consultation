@@ -1,12 +1,8 @@
 package com.example.hospitalmanagement.FRAGMENTS
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,10 +13,12 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.example.hospitalmanagement.AppointmentStatus
 import com.example.hospitalmanagement.MainViewModel
 import com.example.hospitalmanagement.R
-import java.util.Locale
+import com.example.hospitalmanagement.VoiceRecognitionService
+import kotlinx.coroutines.launch
 
 class DoctorHomeFragment : Fragment() {
     private var tvLiveTranscript: TextView? = null
@@ -30,8 +28,9 @@ class DoctorHomeFragment : Fragment() {
     private var tvStatus: TextView? = null
 
     private lateinit var viewModel: MainViewModel
-    private var speechRecognizer: SpeechRecognizer? = null
-    private var isListening = false
+    private var voiceService: VoiceRecognitionService? = null
+    private var currentSessionTranscript = StringBuilder()
+    private var isRecordingSession = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -49,130 +48,150 @@ class DoctorHomeFragment : Fragment() {
 
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
-        setupMic()
+        setupVoiceService()
+        setupMicButton()
         observeData()
 
         return view
     }
 
-    private fun setupMic() {
-        if (SpeechRecognizer.isRecognitionAvailable(requireContext())) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(requireContext())
-        } else {
-            tvStatus?.text = "Speech Recognition not available"
-            btnMic?.isEnabled = false
-            return
-        }
+    private fun setupVoiceService() {
+        voiceService = VoiceRecognitionService(
+            context = requireContext(),
+            onResult = { text ->
+                handleVoiceResult(text)
+            },
+            onError = { error ->
+                activity?.runOnUiThread {
+                    tvStatus?.text = error
+                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                    updateMicButton(false)
+                }
+            }
+        )
+    }
 
+    private fun setupMicButton() {
         btnMic?.setOnClickListener {
-            if (checkPermission()) {
-                if (!isListening) {
-                    startListening()
-                } else {
-                    stopListening()
-                }
+            if (checkPermissions()) {
+                toggleRecording()
             } else {
-                requestPermission()
+                requestPermissions()
             }
         }
+    }
 
-        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {
-                tvStatus?.text = "Listening..."
-            }
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {
-                tvStatus?.text = "Processing..."
-            }
-            override fun onError(error: Int) {
-                isListening = false
-                val errorMsg = when(error) {
-                    SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected"
-                    SpeechRecognizer.ERROR_NETWORK -> "Network error"
-                    else -> "Error: $error"
-                }
-                tvStatus?.text = "$errorMsg. Tap to retry."
-                updateMicIcon(false)
-            }
-            override fun onResults(results: Bundle?) {
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (!matches.isNullOrEmpty()) {
-                    val text = matches[0]
-                    viewModel.addToTranscript(text)
+    private fun toggleRecording() {
+        if (isRecordingSession) {
+            stopConsultationSession()
+        } else {
+            startConsultationSession()
+        }
+    }
 
-                    // Trigger AI Analysis automatically after speech
-                    analyzeWithAI(text)
-                }
-                isListening = false
-                updateMicIcon(false)
-                tvStatus?.text = "Tap to Record"
-            }
-            override fun onPartialResults(partialResults: Bundle?) {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
+    private fun startConsultationSession() {
+        // Start a new consultation session
+        viewModel.startConsultation(1) // Using dummy appointment ID
+        currentSessionTranscript.clear()
+        isRecordingSession = true
+        
+        updateMicButton(true)
+        tvStatus?.text = "Recording Session - Tap to continue"
+        tvLiveTranscript?.text = "Session started. Speak naturally during the consultation..."
+        
+        // Start listening
+        startListening()
     }
 
     private fun startListening() {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-
-        speechRecognizer?.startListening(intent)
-        isListening = true
-        updateMicIcon(true)
-        tvStatus?.text = "Listening..."
-
-        // Clear previous session if needed
-        if (tvLiveTranscript?.text.toString().contains("Tap the mic")) {
-            viewModel.startConsultation(1) // Using dummy appointment ID 1 for now
+        if (isRecordingSession) {
+            voiceService?.startListening()
+            tvStatus?.text = "Listening..."
+            updateMicButton(true)
         }
     }
 
-    private fun stopListening() {
-        speechRecognizer?.stopListening()
-        isListening = false
-        updateMicIcon(false)
-    }
-
-    private fun analyzeWithAI(text: String) {
-        tvStatus?.text = "Consulting Gemini AI..."
-        viewModel.extractMedicalInfo(text) { result ->
-            // This runs when AI finishes
-            activity?.runOnUiThread {
-                Toast.makeText(context, "Diagnosis: ${result.diagnosis}", Toast.LENGTH_LONG).show()
-                tvStatus?.text = "AI Analysis Complete"
-            }
-        }
-    }
-
-    private fun updateMicIcon(listening: Boolean) {
-        if (listening) {
-            btnMic?.setColorFilter(ContextCompat.getColor(requireContext(), android.R.color.holo_red_light))
+    private fun stopConsultationSession() {
+        isRecordingSession = false
+        voiceService?.stopListening()
+        updateMicButton(false)
+        tvStatus?.text = "Processing consultation..."
+        
+        val transcript = currentSessionTranscript.toString()
+        if (transcript.isNotBlank()) {
+            processConsultation(transcript)
         } else {
-            btnMic?.setColorFilter(ContextCompat.getColor(requireContext(), android.R.color.white))
+            tvStatus?.text = "No content recorded"
+            tvLiveTranscript?.text = "Tap the mic to start a new session..."
         }
     }
 
-    private fun observeData() {
-        viewModel.currentDoctor.observe(viewLifecycleOwner) { doctor ->
-            doctor?.let { tvDoctorName?.text = it.name }
-        }
-
-        viewModel.upcomingAppointments.observe(viewLifecycleOwner) { appointments ->
-            val scheduledCount = appointments.count { it.status == AppointmentStatus.SCHEDULED }
-            tvScheduleCount?.text = "$scheduledCount Appointments Remaining"
-        }
-
-        viewModel.consultationTranscript.observe(viewLifecycleOwner) { transcript ->
-            if (transcript.isNotBlank()) {
-                updateTranscript(transcript)
+    private fun handleVoiceResult(text: String) {
+        activity?.runOnUiThread {
+            // Add to transcript
+            if (currentSessionTranscript.isNotEmpty()) {
+                currentSessionTranscript.append(" ")
+            }
+            currentSessionTranscript.append(text)
+            
+            // Update UI
+            updateTranscript(currentSessionTranscript.toString())
+            viewModel.addToTranscript(text)
+            
+            // Continue listening if session is active
+            if (isRecordingSession) {
+                // Small delay before next listening cycle
+                btnMic?.postDelayed({
+                    if (isRecordingSession) {
+                        startListening()
+                    }
+                }, 500)
             }
         }
     }
 
-    // ✅ ADDED THIS MISSING FUNCTION
+    private fun processConsultation(transcript: String) {
+        lifecycleScope.launch {
+            try {
+                tvStatus?.text = "Analyzing with AI..."
+                
+                viewModel.extractMedicalInfo(transcript) { result ->
+                    activity?.runOnUiThread {
+                        val summary = buildString {
+                            append("✅ Consultation Analysis Complete\n\n")
+                            append("Symptoms: ${result.symptoms}\n\n")
+                            append("Diagnosis: ${result.diagnosis}\n\n")
+                            append("Severity: ${result.severity}\n\n")
+                            append("Medications: ${result.medications.size} prescribed\n\n")
+                            if (result.labTests.isNotEmpty()) {
+                                append("Tests: ${result.labTests.joinToString(", ")}\n\n")
+                            }
+                            append("Instructions: ${result.instructions}")
+                        }
+                        
+                        updateTranscript(summary)
+                        tvStatus?.text = "Tap mic to start new session"
+                        
+                        // Show success message
+                        Toast.makeText(
+                            context,
+                            "Consultation processed successfully",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        
+                        // Speak summary
+                        voiceService?.speak("Consultation analysis complete. ${result.diagnosis}")
+                    }
+                }
+            } catch (e: Exception) {
+                activity?.runOnUiThread {
+                    tvStatus?.text = "Error: ${e.message}"
+                    Toast.makeText(context, "Failed to process", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     fun updateTranscript(text: String) {
         tvLiveTranscript?.text = if (text.isBlank()) {
             "Tap the mic below to start a consultation session..."
@@ -181,16 +200,63 @@ class DoctorHomeFragment : Fragment() {
         }
     }
 
-    private fun checkPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    private fun updateMicButton(isActive: Boolean) {
+        if (isActive) {
+            btnMic?.setColorFilter(
+                ContextCompat.getColor(requireContext(), android.R.color.holo_red_light)
+            )
+            btnMic?.setImageResource(R.drawable.ic_stop)
+        } else {
+            btnMic?.setColorFilter(
+                ContextCompat.getColor(requireContext(), android.R.color.white)
+            )
+            btnMic?.setImageResource(R.drawable.ic_mic)
+        }
     }
 
-    private fun requestPermission() {
-        ActivityCompat.requestPermissions(requireActivity(), arrayOf(Manifest.permission.RECORD_AUDIO), 1)
+    private fun observeData() {
+        viewModel.currentDoctor.observe(viewLifecycleOwner) { doctor ->
+            doctor?.let { 
+                tvDoctorName?.text = it.name 
+            }
+        }
+
+        viewModel.upcomingAppointments.observe(viewLifecycleOwner) { appointments ->
+            val scheduledCount = appointments.count { 
+                it.status == AppointmentStatus.SCHEDULED 
+            }
+            tvScheduleCount?.text = "$scheduledCount Appointments Remaining"
+        }
+
+        viewModel.consultationTranscript.observe(viewLifecycleOwner) { transcript ->
+            if (transcript.isNotBlank() && !isRecordingSession) {
+                updateTranscript(transcript)
+            }
+        }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        speechRecognizer?.destroy()
+    private fun checkPermissions(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestPermissions() {
+        ActivityCompat.requestPermissions(
+            requireActivity(),
+            arrayOf(Manifest.permission.RECORD_AUDIO),
+            PERMISSION_REQUEST_CODE
+        )
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        voiceService?.shutdown()
+        voiceService = null
+    }
+
+    companion object {
+        private const val PERMISSION_REQUEST_CODE = 100
     }
 }

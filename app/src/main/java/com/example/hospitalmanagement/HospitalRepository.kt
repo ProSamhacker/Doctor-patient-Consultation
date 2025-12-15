@@ -1,18 +1,7 @@
 package com.example.hospitalmanagement
 
 import android.util.Log
-import com.example.hospitalmanagement.DAO.AiExtractionDao
-import com.example.hospitalmanagement.DAO.AppointmentDao
-import com.example.hospitalmanagement.DAO.ConsultationSessionDao
-import com.example.hospitalmanagement.DAO.DoctorDao
-import com.example.hospitalmanagement.DAO.EmergencyContactDao
-import com.example.hospitalmanagement.DAO.MedicalReportDao
-import com.example.hospitalmanagement.DAO.MedicationDao
-import com.example.hospitalmanagement.DAO.MessageDao
-import com.example.hospitalmanagement.DAO.NotificationDao
-import com.example.hospitalmanagement.DAO.PatientDao
-import com.example.hospitalmanagement.DAO.PrescriptionDao
-import com.example.hospitalmanagement.DAO.VitalSignsDao
+import com.example.hospitalmanagement.DAO.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +28,9 @@ class HospitalRepository(
     private val medicationDao: MedicationDao
 ) {
 
+    // Get API key from BuildConfig (generated during build)
     private val geminiApiKey = BuildConfig.GEMINI_API_KEY
+    
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -65,7 +56,6 @@ class HospitalRepository(
     suspend fun createAppointment(appointment: Appointment): Long {
         val appId = appointmentDao.insert(appointment)
 
-        // Send notifications
         val doctor = doctorDao.getById(appointment.doctorId)
         val patient = patientDao.getById(appointment.patientId)
 
@@ -109,7 +99,6 @@ class HospitalRepository(
     suspend fun createPrescription(prescription: Prescription): Long {
         val scriptId = prescriptionDao.insert(prescription)
 
-        // Send notification to patient
         val appointment = appointmentDao.getById(prescription.appId)
         appointment?.let {
             notificationDao.insert(
@@ -135,7 +124,6 @@ class HospitalRepository(
     suspend fun sendMessage(message: Message): Long {
         val msgId = messageDao.insert(message)
 
-        // Notify recipient
         val appointment = appointmentDao.getById(message.appId)
         appointment?.let {
             val recipientId = if (message.senderType == "DOCTOR") it.patientId else it.doctorId
@@ -192,50 +180,91 @@ class HospitalRepository(
      * Extract medical information from consultation transcript
      */
     suspend fun extractMedicalInfo(transcript: String): MedicalExtractionResult {
+        if (transcript.isBlank()) {
+            return MedicalExtractionResult(
+                symptoms = "No symptoms recorded",
+                diagnosis = "Consultation incomplete",
+                severity = "NORMAL",
+                medications = emptyList(),
+                labTests = emptyList(),
+                instructions = "Please complete consultation",
+                followUpDays = null
+            )
+        }
+
         val prompt = """
-            Analyze this doctor-patient conversation and extract medical information.
+            You are a medical AI assistant. Analyze this doctor-patient conversation and extract key information.
             
             Conversation: "$transcript"
             
-            Return ONLY a valid JSON object (no markdown formatting):
+            Provide a JSON response with this EXACT structure (no markdown, no backticks):
             {
-                "symptoms": "comma-separated list of symptoms",
-                "diagnosis": "potential diagnosis",
-                "severity": "LOW|NORMAL|HIGH|CRITICAL",
+                "symptoms": "comma-separated list of symptoms mentioned",
+                "diagnosis": "most likely diagnosis based on symptoms",
+                "severity": "LOW or NORMAL or HIGH or CRITICAL",
                 "medications": [
                     {
                         "name": "medication name",
-                        "dosage": "dosage amount",
-                        "frequency": "how often",
-                        "duration": "how long",
-                        "timing": "when to take",
+                        "dosage": "e.g., 500mg",
+                        "frequency": "e.g., Twice daily",
+                        "duration": "e.g., 7 days",
+                        "timing": "e.g., After food",
                         "instructions": "additional notes"
                     }
                 ],
-                "labTests": ["list of recommended tests"],
-                "instructions": "general care instructions",
+                "labTests": ["test name 1", "test name 2"],
+                "instructions": "general care instructions for patient",
                 "followUpDays": 7
             }
+            
+            Important:
+            - If symptoms unclear, list "symptoms require clarification"
+            - If no diagnosis clear, say "pending further evaluation"
+            - Only suggest common, safe medications
+            - Always include follow-up recommendation
         """.trimIndent()
 
-        val responseText = queryGemini(prompt, summarize = false)
-        return parseMedicalExtraction(responseText)
+        return try {
+            val responseText = queryGemini(prompt, summarize = false)
+            parseMedicalExtraction(responseText)
+        } catch (e: Exception) {
+            Log.e("REPO_ERROR", "Medical extraction failed", e)
+            MedicalExtractionResult(
+                symptoms = "Error processing consultation",
+                diagnosis = "Please review manually: ${e.message}",
+                severity = "NORMAL",
+                medications = emptyList(),
+                labTests = emptyList(),
+                instructions = "Manual review required",
+                followUpDays = 7
+            )
+        }
     }
 
     /**
      * Get layman explanation of medical terms
      */
     suspend fun getLaymanExplanation(query: String): String {
+        if (query.isBlank()) {
+            return "Please ask a specific medical question."
+        }
+
         val prompt = """
-            You are a helpful medical assistant explaining to a patient.
-            Explain this in very simple language (max 3 sentences):
+            You are explaining medical concepts to a patient with no medical background.
             
-            "$query"
+            Question: "$query"
             
-            Use everyday words, avoid jargon, and be empathetic.
+            Provide a clear, simple explanation in 2-3 sentences using everyday language.
+            Avoid medical jargon. Be empathetic and reassuring.
+            If it's a serious condition, gently suggest consulting a doctor.
         """.trimIndent()
 
-        return queryGemini(prompt, summarize = false)
+        return try {
+            queryGemini(prompt, summarize = true)
+        } catch (e: Exception) {
+            Log.e("REPO_ERROR", "Layman explanation failed", e)
+            "I'm having trouble explaining that right now. Please ask your doctor for clarification."
+        }
     }
 
     /**
@@ -254,15 +283,26 @@ class HospitalRepository(
      * Query Gemini AI
      */
     private suspend fun queryGemini(prompt: String, summarize: Boolean = true): String {
+        if (geminiApiKey.isBlank() || geminiApiKey == "null") {
+            throw IllegalStateException(
+                "Gemini API key not configured. Please add GEMINI_API_KEY to gradle.properties"
+            )
+        }
+
         val enhancedPrompt = if (summarize) {
-            "Provide a concise answer (2-3 sentences max): $prompt"
+            "Provide a concise, clear answer: $prompt"
         } else {
             prompt
         }
 
-        val url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=$geminiApiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=$geminiApiKey"
 
-        val safePrompt = enhancedPrompt.replace("\"", "\\\"").replace("\n", " ")
+        val safePrompt = enhancedPrompt
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
 
         val requestBody = """
         {
@@ -270,50 +310,86 @@ class HospitalRepository(
             "parts":[{
               "text": "$safePrompt"
             }]
-          }]
+          }],
+          "generationConfig": {
+            "temperature": 0.7,
+            "topK": 40,
+            "topP": 0.95,
+            "maxOutputTokens": 2048
+          }
         }
         """.trimIndent()
 
-        val request = Request.Builder()
-            .url(url)
-            .post(requestBody.toRequestBody("application/json".toMediaType()))
-            .build()
-
         return withContext(Dispatchers.IO) {
             try {
+                val request = Request.Builder()
+                    .url(url)
+                    .post(requestBody.toRequestBody("application/json".toMediaType()))
+                    .addHeader("Content-Type", "application/json")
+                    .build()
+
                 val response = client.newCall(request).execute()
-                val responseBody = response.body?.string()
-                Log.d("GEMINI_API", "Response: $responseBody")
+                
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: "Unknown error"
+                    Log.e("GEMINI_API", "Error ${response.code}: $errorBody")
+                    throw IOException("API request failed: ${response.code}")
+                }
+
+                val responseBody = response.body?.string() 
+                    ?: throw IOException("Empty response from API")
+                
+                Log.d("GEMINI_API", "Success response received")
                 extractTextFromGemini(responseBody)
             } catch (e: IOException) {
-                Log.e("GEMINI_API", "Error: ${e.message}", e)
-                "Network error: ${e.message}"
+                Log.e("GEMINI_API", "Network error", e)
+                throw IOException("Network error: Please check your internet connection")
+            } catch (e: Exception) {
+                Log.e("GEMINI_API", "Unexpected error", e)
+                throw Exception("Failed to process request: ${e.message}")
             }
         }
     }
 
     private fun extractTextFromGemini(jsonString: String?): String {
-        if (jsonString.isNullOrBlank()) return "Error: Empty response"
+        if (jsonString.isNullOrBlank()) {
+            throw IllegalArgumentException("Empty response from API")
+        }
 
         return try {
             val gson = Gson()
-            val responseMap = gson.fromJson(jsonString, Map::class.java)
+            @Suppress("UNCHECKED_CAST")
+            val responseMap = gson.fromJson(jsonString, Map::class.java) as Map<String, Any>
 
             if (responseMap.containsKey("error")) {
-                return "API Error: ${responseMap["error"]}"
+                val error = responseMap["error"] as? Map<*, *>
+                val message = error?.get("message") ?: "Unknown error"
+                throw IOException("API Error: $message")
             }
 
+            @Suppress("UNCHECKED_CAST")
             val candidates = responseMap["candidates"] as? List<Map<String, Any>>
-            if (candidates.isNullOrEmpty()) return "Error: No content"
+            if (candidates.isNullOrEmpty()) {
+                throw IllegalArgumentException("No content in API response")
+            }
 
-            val content = candidates[0]["content"] as Map<String, Any>
-            val parts = content["parts"] as List<Map<String, String>>
-            val text = parts[0]["text"] ?: ""
+            @Suppress("UNCHECKED_CAST")
+            val content = candidates[0]["content"] as? Map<String, Any>
+                ?: throw IllegalArgumentException("Invalid response structure")
+            
+            @Suppress("UNCHECKED_CAST")
+            val parts = content["parts"] as? List<Map<String, String>>
+                ?: throw IllegalArgumentException("Invalid response structure")
+                
+            val text = parts.firstOrNull()?.get("text")
+                ?: throw IllegalArgumentException("No text in response")
 
-            text.replace("```json", "").replace("```", "").trim()
+            text.replace("```json", "")
+                .replace("```", "")
+                .trim()
         } catch (e: Exception) {
-            Log.e("GEMINI_PARSE", "Error parsing: $jsonString", e)
-            "Error parsing response: ${e.localizedMessage}"
+            Log.e("GEMINI_PARSE", "Parse error: $jsonString", e)
+            throw Exception("Failed to parse API response: ${e.message}")
         }
     }
 
@@ -321,26 +397,35 @@ class HospitalRepository(
         return try {
             val gson = Gson()
             val type = object : TypeToken<MedicalExtractionResult>() {}.type
-            gson.fromJson(jsonString, type)
+            val result: MedicalExtractionResult = gson.fromJson(jsonString, type)
+            
+            if (result.symptoms.isBlank()) {
+                throw IllegalArgumentException("Invalid extraction: no symptoms")
+            }
+            
+            result
         } catch (e: Exception) {
             Log.e("JSON_PARSE", "Failed to parse: $jsonString", e)
+            
+            val diagnosisMatch = Regex("\"diagnosis\"\\s*:\\s*\"([^\"]+)\"").find(jsonString)
+            val symptomsMatch = Regex("\"symptoms\"\\s*:\\s*\"([^\"]+)\"").find(jsonString)
+            
             MedicalExtractionResult(
-                symptoms = "Could not extract",
-                diagnosis = "Analysis failed",
+                symptoms = symptomsMatch?.groupValues?.get(1) ?: "Could not extract symptoms",
+                diagnosis = diagnosisMatch?.groupValues?.get(1) ?: "Analysis incomplete",
                 severity = "NORMAL",
                 medications = emptyList(),
                 labTests = emptyList(),
-                instructions = "Please review consultation manually",
-                followUpDays = null
+                instructions = "Please review consultation notes manually. AI extraction incomplete.",
+                followUpDays = 7
             )
         }
     }
 
-    // ===== Vital Signs Operations =====
+    // ===== Other Operations =====
     suspend fun recordVitals(vitals: VitalSigns) = vitalSignsDao.insert(vitals)
     fun getAppointmentVitals(appId: Int) = vitalSignsDao.getByAppointment(appId)
 
-    // ===== Notification Operations =====
     suspend fun createNotification(notification: NotificationEntity) = notificationDao.insert(notification)
     fun getUserNotifications(userId: String) = notificationDao.getByUser(userId)
     fun getUnreadNotifications(userId: String) = notificationDao.getUnread(userId)
@@ -348,12 +433,10 @@ class HospitalRepository(
     suspend fun markNotificationRead(id: Int) = notificationDao.markAsRead(id)
     suspend fun markAllNotificationsRead(userId: String) = notificationDao.markAllAsRead(userId)
 
-    // ===== Emergency Contact Operations =====
     suspend fun addEmergencyContact(contact: EmergencyContact) = emergencyContactDao.insert(contact)
     fun getPatientEmergencyContacts(patientId: String) = emergencyContactDao.getByPatient(patientId)
     suspend fun getPrimaryEmergencyContact(patientId: String) = emergencyContactDao.getPrimaryContact(patientId)
 
-    // ===== Medication Operations =====
     suspend fun getAllMedications() = medicationDao.getAll()
     suspend fun insertMedication(medication: Medication) = medicationDao.insert(medication)
     suspend fun updateMedication(medication: Medication) = medicationDao.update(medication)

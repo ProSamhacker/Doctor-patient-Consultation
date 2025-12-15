@@ -11,6 +11,7 @@ android {
     buildFeatures {
         buildConfig = true
     }
+    
     defaultConfig {
         applicationId = "com.example.hospitalmanagement"
         minSdk = 21
@@ -19,12 +20,13 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-                buildConfigField(
-                    "String",
-                    "GEMINI_API_KEY",
-                    "\"${project.properties["GEMINI_API_KEY"]}\""
-                )
-
+        
+        // ✅ FIXED - Remove the extra quotes around the property value
+        buildConfigField(
+            "String",
+            "GEMINI_API_KEY",
+            "\"${project.findProperty("GEMINI_API_KEY") ?: "YOUR_KEY_HERE"}\""
+        )
     }
 
     buildTypes {
@@ -36,10 +38,12 @@ android {
             )
         }
     }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    
     kotlinOptions {
         jvmTarget = "11"
     }
@@ -55,27 +59,28 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
-    // ✅ RecyclerView
+    // RecyclerView
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
-    // ✅ Room (Database)
+    // Room (Database)
     implementation("androidx.room:room-runtime:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
 
-    // ✅ Coroutines (for Room operations)
+    // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
 
-    // ✅ Lifecycle (so we can use lifecycleScope)
+    // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
-
-    // ... your existing dependencies (core, appcompat, material, room)
-// For ViewModel and LiveData
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.5.1")
-// For Networking (to call Gemini API)
+
+    // Gemini AI
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+
+    // Networking
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
-// For JSON Parsing (to handle Gemini response)
+
+    // JSON
     implementation("com.google.code.gson:gson:2.9.0")
 }
