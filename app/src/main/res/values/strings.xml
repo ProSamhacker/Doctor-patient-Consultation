@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Medication Assistant</string>
+    <string name="speak_command_description">Speak a voice command</string>
+    <string name="stop_response_description">Stop the assistant from speaking</string>
+    <string name="add_medication_manually">Add medication manually</string>
+
+    <!-- Strings for the manual add dialog -->
+    <string name="add_new_medication_title">Add New Medication</string>
+    <string name="medication_name_hint">Medication Name</string>
+    <string name="section_hint">Section (e.g., Cardiology)</string>
+</resources>
