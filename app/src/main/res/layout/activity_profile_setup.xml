@@ -317,7 +317,7 @@
             android:id="@+id/btnSave"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:text="Save & Continue"
+            android:text="Save &amp; Continue"
             android:textSize="16sp"
             android:textStyle="bold"
             android:layout_marginTop="32dp"

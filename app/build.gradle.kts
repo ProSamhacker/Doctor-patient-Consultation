@@ -25,7 +25,12 @@ android {
         buildConfigField(
             "String",
             "GEMINI_API_KEY",
-            "\"${project.findProperty("GEMINI_API_KEY") ?: "YOUR_KEY_HERE"}\""
+            "\"${project.findProperty("GEMINI_API_KEY") ?: "AIzaSyC97B02tPs5C2JCvtTLE46fVhD9YFcaRSE"}\""
+        )
+        buildConfigField(
+        "String",
+        "VERCEL_BLOB_TOKEN",
+        "\"${project.findProperty("VERCEL_BLOB_TOKEN") ?: "YOUR_VERCEL_TOKEN_HERE"}\""
         )
     }
 

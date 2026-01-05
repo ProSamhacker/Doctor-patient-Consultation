@@ -31,7 +31,7 @@ class HospitalRepository(
 
     // Model for structured data extraction (Forces JSON output)
     private val extractionModel = GenerativeModel(
-        modelName = "gemini-1.5-flash",
+        modelName = "gemini-2.5-flash",
         apiKey = geminiApiKey,
         generationConfig = generationConfig {
             responseMimeType = "application/json"

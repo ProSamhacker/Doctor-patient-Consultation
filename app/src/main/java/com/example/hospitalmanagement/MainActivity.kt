@@ -10,8 +10,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import com.example.hospitalmanagement.databinding.ActivityMainBinding
 import com.example.hospitalmanagement.FRAGMENTS.AppointmentsFragment
 import com.example.hospitalmanagement.FRAGMENTS.DoctorHomeFragment
 import com.example.hospitalmanagement.FRAGMENTS.MessagesFragment
@@ -23,6 +25,8 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var binding: ActivityMainBinding
+    
     private lateinit var viewModel: MainViewModel
     private lateinit var repository: HospitalRepository
     private var userRole: String = "PATIENT"
@@ -41,14 +45,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)     
+        
         userRole = intent.getStringExtra("USER_ROLE") ?: "PATIENT"
         userId = intent.getStringExtra("USER_ID") ?: if (userRole == "DOCTOR") "DOC001" else "PAT001"
 
         val database = AppDatabase.getDatabase(this)
         
-        // NO CONTEXT parameter - BuildConfig is used instead
         repository = HospitalRepository(
             database.doctorDao(),
             database.patientDao(),
@@ -73,17 +78,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupUI() {
         if (userRole == "DOCTOR") {
-            setContentView(R.layout.activity_doctor_dashboard)
             setupDoctorUI()
         } else {
-            setContentView(R.layout.activity_patient_dashboard)
             setupPatientUI()
         }
     }
 
     private fun setupDoctorUI() {
-        val fabMic = findViewById<FloatingActionButton>(R.id.fabMic)
-        val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNavigationView)
+        val fabMic = findViewById<FloatingActionButton>(R.id.fabMic) ?: return
+        val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNavigationView) ?: return
 
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, DoctorHomeFragment())
@@ -113,11 +116,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupPatientUI() {
-        val fabMic = findViewById<FloatingActionButton>(R.id.fabMicPatient)
-        val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNavigationViewPatient)
+        val fabMic = findViewById<FloatingActionButton>(R.id.fabMicPatient) ?: return
+        val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNavigationViewPatient) ?: return
+
+        val containerId = R.id.fragment_container_patient
+        
+        val validContainerId = if (findViewById<android.view.View>(containerId) != null) containerId else R.id.fragment_container
 
         supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container_patient, PatientHomeFragment())
+            .replace(validContainerId, PatientHomeFragment())
             .commit()
 
         bottomNav.setOnItemSelectedListener { item ->
@@ -130,13 +137,13 @@ class MainActivity : AppCompatActivity() {
             }
             
             supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container_patient, fragment)
+                .replace(validContainerId, fragment)
                 .commit()
             true
         }
 
         fabMic.setOnClickListener {
-            val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container_patient)
+            val fragment = supportFragmentManager.findFragmentById(validContainerId)
             if (fragment is PatientHomeFragment) {
                 fragment.openLaymanTranslator()
             } else {
@@ -167,10 +174,10 @@ class MainActivity : AppCompatActivity() {
     private fun callEmergency(number: String) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE)
             == PackageManager.PERMISSION_GRANTED) {
-            val intent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$number"))
+            val intent = Intent(Intent.ACTION_CALL, "tel:$number".toUri())
             startActivity(intent)
         } else {
-            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))
+            val intent = Intent(Intent.ACTION_DIAL, "tel:$number".toUri())
             startActivity(intent)
         }
     }
@@ -184,14 +191,14 @@ class MainActivity : AppCompatActivity() {
                 latestAppointment?.let { appointment ->
                     val doctor = repository.getDoctor(appointment.doctorId)
                     doctor?.let {
-                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${it.phone}"))
+                        val intent = Intent(Intent.ACTION_DIAL, "tel:${it.phone}".toUri())
                         startActivity(intent)
                     }
                 } ?: run {
                     Toast.makeText(this@MainActivity, 
                         "No doctor assigned yet", Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Toast.makeText(this@MainActivity, 
                     "Failed to get doctor info", Toast.LENGTH_SHORT).show()
             }

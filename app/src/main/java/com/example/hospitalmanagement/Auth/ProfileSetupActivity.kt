@@ -5,6 +5,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.widget.RadioButton
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,15 +21,16 @@ import com.example.hospitalmanagement.storage.VercelBlobStorage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import java.util.Date
 
-class ProfileSetupActivityWithUpload : AppCompatActivity() {
-    
+class ProfileSetupActivity : AppCompatActivity() {
+
     private lateinit var binding: ActivityProfileSetupBinding
     private lateinit var auth: FirebaseAuth
     private lateinit var firestore: FirebaseFirestore
     private lateinit var storage: VercelBlobStorage
     private lateinit var userType: UserType
-    
+
     private var selectedImageUri: Uri? = null
     private lateinit var imagePickerLauncher: ActivityResultLauncher<String>
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
@@ -41,15 +44,19 @@ class ProfileSetupActivityWithUpload : AppCompatActivity() {
         firestore = FirebaseFirestore.getInstance()
         storage = VercelBlobStorage(this)
 
+        // Get UserType from Intent, default to PATIENT if missing
         val userTypeString = intent.getStringExtra("USER_TYPE") ?: "PATIENT"
-        userType = UserType.valueOf(userTypeString)
+        userType = try {
+            UserType.valueOf(userTypeString)
+        } catch (e: Exception) {
+            UserType.PATIENT
+        }
 
         setupImagePicker()
         setupUI()
     }
 
     private fun setupImagePicker() {
-        // Register image picker
         imagePickerLauncher = registerForActivityResult(
             ActivityResultContracts.GetContent()
         ) { uri: Uri? ->
@@ -60,7 +67,6 @@ class ProfileSetupActivityWithUpload : AppCompatActivity() {
             }
         }
 
-        // Register permission launcher
         permissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { permissions ->
@@ -68,22 +74,27 @@ class ProfileSetupActivityWithUpload : AppCompatActivity() {
             if (allGranted) {
                 openImagePicker()
             } else {
-                Toast.makeText(
-                    this,
-                    "Permission denied. Cannot select image.",
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(this, "Permission denied. Cannot select image.", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun setupUI() {
-        // Profile image selection
+        // Toggle visibility based on User Type
+        if (userType == UserType.DOCTOR) {
+            binding.layoutDoctorFields.visibility = View.VISIBLE
+            binding.layoutPatientFields.visibility = View.GONE
+            binding.tvTitle.text = "Doctor Profile"
+        } else {
+            binding.layoutDoctorFields.visibility = View.GONE
+            binding.layoutPatientFields.visibility = View.VISIBLE
+            binding.tvTitle.text = "Patient Profile"
+        }
+
         binding.layoutSelectImage.setOnClickListener {
             checkAndRequestPermissions()
         }
 
-        // Rest of your existing setup code...
         binding.btnSave.setOnClickListener {
             if (validateInputs()) {
                 saveProfileWithImage()
@@ -114,50 +125,48 @@ class ProfileSetupActivityWithUpload : AppCompatActivity() {
     }
 
     private fun validateInputs(): Boolean {
-        // Your existing validation code...
+        if (binding.etName.text.toString().isBlank()) {
+            binding.tilName.error = "Name is required"
+            return false
+        }
+        if (binding.etPhone.text.toString().isBlank()) {
+            binding.tilPhone.error = "Phone is required"
+            return false
+        }
         return true
     }
 
     private fun saveProfileWithImage() {
         val userId = auth.currentUser?.uid ?: return
-        
-        binding.progressBar.visibility = android.view.View.VISIBLE
+
+        binding.progressBar.visibility = View.VISIBLE
         binding.btnSave.isEnabled = false
 
         lifecycleScope.launch {
             try {
-                // Upload profile image if selected
                 var profileImageUrl = ""
-                selectedImageUri?.let { uri ->
-                    val uploadResult = storage.uploadProfileImage(uri, userId)
-                    
+                
+                // 1. Upload Image if selected
+                if (selectedImageUri != null) {
+                    val uploadResult = storage.uploadProfileImage(selectedImageUri!!, userId)
                     uploadResult.onSuccess { url ->
                         profileImageUrl = url
-                    }
-                    
-                    uploadResult.onFailure { error ->
-                        Toast.makeText(
-                            this@ProfileSetupActivityWithUpload,
-                            "Image upload failed: ${error.message}",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    }.onFailure { e ->
+                        throw Exception("Image upload failed: ${e.message}")
                     }
                 }
 
-                // Save profile with image URL
+                // 2. Save Firestore Data
                 if (userType == UserType.DOCTOR) {
                     saveDoctorProfile(userId, profileImageUrl)
                 } else {
                     savePatientProfile(userId, profileImageUrl)
                 }
+
             } catch (e: Exception) {
-                binding.progressBar.visibility = android.view.View.GONE
+                binding.progressBar.visibility = View.GONE
                 binding.btnSave.isEnabled = true
-                Toast.makeText(
-                    this@ProfileSetupActivityWithUpload,
-                    "Error: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(this@ProfileSetupActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -165,147 +174,101 @@ class ProfileSetupActivityWithUpload : AppCompatActivity() {
     private fun saveDoctorProfile(userId: String, imageUrl: String) {
         val email = auth.currentUser?.email ?: ""
         
+        // Parse comma-separated qualifications
+        val qualificationsList = binding.etQualifications.text.toString()
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
         val profile = DoctorProfile(
             uid = userId,
             name = binding.etName.text.toString().trim(),
+            email = email,
+            phone = binding.etPhone.text.toString().trim(),
             specialization = binding.etSpecialization.text.toString().trim(),
             hospitalName = binding.etHospital.text.toString().trim(),
-            phone = binding.etPhone.text.toString().trim(),
-            email = email,
+            experience = binding.etExperience.text.toString().toIntOrNull() ?: 0,
+            qualifications = qualificationsList,
+            licenseNumber = binding.etLicense.text.toString().trim(),
+            consultationFee = binding.etFee.text.toString().toDoubleOrNull() ?: 0.0,
+            bio = binding.etBio.text.toString().trim(),
             profileImageUrl = imageUrl,
-            // ... other fields
+            isActive = true,
+            createdAt = Date(),
+            updatedAt = Date()
         )
 
         firestore.collection("doctors").document(userId)
             .set(profile)
-            .addOnSuccessListener {
-                updateUserProfileStatus(userId)
-            }
-            .addOnFailureListener { e ->
-                binding.progressBar.visibility = android.view.View.GONE
-                binding.btnSave.isEnabled = true
-                Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+            .addOnSuccessListener { updateUserProfileStatus(userId) }
+            .addOnFailureListener { e -> handleError(e) }
     }
 
     private fun savePatientProfile(userId: String, imageUrl: String) {
         val email = auth.currentUser?.email ?: ""
-        
+
+        // Get Gender
+        val selectedGenderId = binding.rgGender.checkedRadioButtonId
+        val gender = if (selectedGenderId != -1) {
+            findViewById<RadioButton>(selectedGenderId).text.toString()
+        } else {
+            "Other"
+        }
+
+        // Parse Lists
+        val allergiesList = binding.etAllergies.text.toString()
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+        val conditionsList = binding.etConditions.text.toString()
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
         val profile = PatientProfile(
             uid = userId,
             name = binding.etName.text.toString().trim(),
-            age = binding.etAge.text.toString().trim().toIntOrNull() ?: 0,
-            phone = binding.etPhone.text.toString().trim(),
             email = email,
+            phone = binding.etPhone.text.toString().trim(),
+            age = binding.etAge.text.toString().toIntOrNull() ?: 0,
+            gender = gender,
+            bloodGroup = binding.etBloodGroup.text.toString().trim(),
+            address = binding.etAddress.text.toString().trim(),
+            allergies = allergiesList,
+            chronicConditions = conditionsList,
             profileImageUrl = imageUrl,
-            // ... other fields
+            createdAt = Date(),
+            updatedAt = Date()
         )
 
         firestore.collection("patients").document(userId)
             .set(profile)
-            .addOnSuccessListener {
-                updateUserProfileStatus(userId)
-            }
-            .addOnFailureListener { e ->
-                binding.progressBar.visibility = android.view.View.GONE
-                binding.btnSave.isEnabled = true
-                Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+            .addOnSuccessListener { updateUserProfileStatus(userId) }
+            .addOnFailureListener { e -> handleError(e) }
     }
 
     private fun updateUserProfileStatus(userId: String) {
         firestore.collection("users").document(userId)
             .update("profileComplete", true)
             .addOnSuccessListener {
-                // Navigate to main app
-                // ... your existing navigation code
-            }
-    }
-}
-
-// ===== File Picker for Medical Reports =====
-
-class AppointmentRequestActivity : AppCompatActivity() {
-    
-    private lateinit var storage: VercelBlobStorage
-    private val selectedFiles = mutableListOf<Uri>()
-    private lateinit var filePickerLauncher: ActivityResultLauncher<Array<String>>
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        storage = VercelBlobStorage(this)
-
-        setupFilePicker()
-    }
-
-    private fun setupFilePicker() {
-        // Register file picker for multiple files
-        filePickerLauncher = registerForActivityResult(
-            ActivityResultContracts.OpenMultipleDocuments()
-        ) { uris: List<Uri> ->
-            selectedFiles.clear()
-            selectedFiles.addAll(uris)
-            updateFileList()
-        }
-    }
-
-    private fun openFilePicker() {
-        // Allow PDF, images
-        filePickerLauncher.launch(arrayOf("application/pdf", "image/*"))
-    }
-
-    private fun updateFileList() {
-        // Update UI to show selected files
-        binding.tvSelectedFiles.text = "${selectedFiles.size} files selected"
-    }
-
-    private fun uploadAndSubmitRequest() {
-        lifecycleScope.launch {
-            binding.progressBar.visibility = android.view.View.VISIBLE
-            
-            val uploadedUrls = mutableListOf<String>()
-            
-            for (fileUri in selectedFiles) {
-                val fileName = getFileName(fileUri)
-                val result = storage.uploadMedicalReport(
-                    fileUri,
-                    patientId,
-                    fileName
-                )
+                binding.progressBar.visibility = View.GONE
+                Toast.makeText(this, "Profile Saved Successfully!", Toast.LENGTH_SHORT).show()
                 
-                result.onSuccess { url ->
-                    uploadedUrls.add(url)
-                }
-                
-                result.onFailure { error ->
-                    Toast.makeText(
-                        this@AppointmentRequestActivity,
-                        "Upload failed: ${error.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+                // Navigate to Main Activity
+                val intent = android.content.Intent(this, com.example.hospitalmanagement.MainActivity::class.java)
+                intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                intent.putExtra("USER_ID", userId)
+                intent.putExtra("USER_ROLE", userType.name)
+                startActivity(intent)
+                finish()
             }
-            
-            // Submit appointment request with uploaded files
-            submitRequest(uploadedUrls)
-        }
+            .addOnFailureListener { e -> handleError(e) }
     }
 
-    private fun getFileName(uri: Uri): String {
-        var fileName = "file"
-        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(
-                android.provider.OpenableColumns.DISPLAY_NAME
-            )
-            if (cursor.moveToFirst()) {
-                fileName = cursor.getString(nameIndex)
-            }
-        }
-        return fileName
-    }
-
-    private fun submitRequest(fileUrls: List<String>) {
-        // Save to Firestore with file URLs
-        // ... your Firestore code
+    private fun handleError(e: Exception) {
+        binding.progressBar.visibility = View.GONE
+        binding.btnSave.isEnabled = true
+        Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
     }
 }
