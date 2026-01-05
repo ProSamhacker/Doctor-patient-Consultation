@@ -41,7 +41,7 @@ class HospitalRepository(
 
     // Model for plain text chat/explanation
     private val chatModel = GenerativeModel(
-        modelName = "gemini-1.5-flash",
+        modelName = "gemini-2.5-flash",
         apiKey = geminiApiKey,
         generationConfig = generationConfig {
             temperature = 0.7f

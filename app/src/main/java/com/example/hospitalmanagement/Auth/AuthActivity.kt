@@ -2,11 +2,14 @@ package com.example.hospitalmanagement.auth
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.addTextChangedListener
+import com.example.hospitalmanagement.DoctorDashboardActivity
+import com.example.hospitalmanagement.PatientDashboardActivity
 import com.example.hospitalmanagement.R
 import com.example.hospitalmanagement.databinding.ActivityAuthBinding
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -19,7 +22,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 
 class AuthActivity : AppCompatActivity() {
-    
+
     private lateinit var binding: ActivityAuthBinding
     private lateinit var auth: FirebaseAuth
     private lateinit var firestore: FirebaseFirestore
@@ -35,18 +38,59 @@ class AuthActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
         firestore = FirebaseFirestore.getInstance()
 
-        // Check if user is already logged in
-        if (auth.currentUser != null) {
-            checkUserProfile()
-            return
-        }
-
         setupGoogleSignIn()
         setupUI()
+
+        // STARTUP CHECK:
+        // Hide the login form initially to prevent "flashing" for logged-in users.
+        setLoadingState(true)
+
+        if (auth.currentUser != null) {
+            // User is theoretically logged in, but let's check if they finished setup.
+            checkUserProfileOnStartup()
+        } else {
+            // No user found, show the login form immediately.
+            setLoadingState(false)
+        }
+    }
+
+    /**
+     * Toggles visibility between the Login Form and the Loading Spinner.
+     */
+    private fun setLoadingState(isLoading: Boolean) {
+        if (isLoading) {
+            binding.progressBar.visibility = View.VISIBLE
+
+            // Hide all form elements including the "OR" divider
+            binding.tilEmail.visibility = View.GONE
+            binding.tilPassword.visibility = View.GONE
+            binding.btnPrimary.visibility = View.GONE
+            binding.btnGoogleSignIn.visibility = View.GONE
+            binding.tvToggleMode.visibility = View.GONE
+            binding.tvTitle.visibility = View.GONE
+            binding.tvSubtitle.visibility = View.GONE
+
+            // Note: Ensure your XML actually has an ID 'layoutDivider'.
+            // If you removed it in previous steps, remove this line.
+            // binding.layoutDivider.visibility = View.GONE
+
+        } else {
+            binding.progressBar.visibility = View.GONE
+
+            // Show all form elements
+            binding.tilEmail.visibility = View.VISIBLE
+            binding.tilPassword.visibility = View.VISIBLE
+            binding.btnPrimary.visibility = View.VISIBLE
+            binding.btnGoogleSignIn.visibility = View.VISIBLE
+            binding.tvToggleMode.visibility = View.VISIBLE
+            binding.tvTitle.visibility = View.VISIBLE
+            binding.tvSubtitle.visibility = View.VISIBLE
+
+            // binding.layoutDivider.visibility = View.VISIBLE
+        }
     }
 
     private fun setupGoogleSignIn() {
-        // Configure Google Sign In
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
@@ -54,7 +98,6 @@ class AuthActivity : AppCompatActivity() {
 
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
-        // Register launcher for Google Sign In
         googleSignInLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
@@ -63,86 +106,36 @@ class AuthActivity : AppCompatActivity() {
                 val account = task.getResult(ApiException::class.java)
                 firebaseAuthWithGoogle(account)
             } catch (e: ApiException) {
-                Toast.makeText(
-                    this,
-                    "Google sign in failed: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                setLoadingState(false)
+                Toast.makeText(this, "Google sign in failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun setupUI() {
-        // Toggle between login and signup
         binding.tvToggleMode.setOnClickListener {
             isLoginMode = !isLoginMode
             updateUI()
         }
 
-        // Primary button (Login/Signup)
         binding.btnPrimary.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
             val password = binding.etPassword.text.toString().trim()
 
             if (validateInput(email, password)) {
-                if (isLoginMode) {
-                    loginUser(email, password)
-                } else {
-                    signupUser(email, password)
-                }
+                if (isLoginMode) loginUser(email, password) else signupUser(email, password)
             }
         }
 
-        // Google Sign In button
         binding.btnGoogleSignIn.setOnClickListener {
-            signInWithGoogle()
+            val signInIntent = googleSignInClient.signInIntent
+            googleSignInLauncher.launch(signInIntent)
         }
 
-        // Text change listeners for validation
-        binding.etEmail.addTextChangedListener { 
-            binding.tilEmail.error = null 
-        }
-        binding.etPassword.addTextChangedListener { 
-            binding.tilPassword.error = null 
-        }
+        binding.etEmail.addTextChangedListener { binding.tilEmail.error = null }
+        binding.etPassword.addTextChangedListener { binding.tilPassword.error = null }
 
         updateUI()
-    }
-
-    private fun signInWithGoogle() {
-        val signInIntent = googleSignInClient.signInIntent
-        googleSignInLauncher.launch(signInIntent)
-    }
-
-    private fun firebaseAuthWithGoogle(account: GoogleSignInAccount) {
-        binding.progressBar.visibility = android.view.View.VISIBLE
-
-        val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-        auth.signInWithCredential(credential)
-            .addOnCompleteListener(this) { task ->
-                binding.progressBar.visibility = android.view.View.GONE
-
-                if (task.isSuccessful) {
-                    // Check if this is a new user
-                    val isNewUser = task.result?.additionalUserInfo?.isNewUser ?: false
-                    
-                    if (isNewUser) {
-                        // Navigate to role selection
-                        val intent = Intent(this, RoleSelectionActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
-                    } else {
-                        checkUserProfile()
-                    }
-                } else {
-                    Toast.makeText(
-                        this,
-                        "Authentication failed: ${task.exception?.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
     }
 
     private fun updateUI() {
@@ -161,7 +154,6 @@ class AuthActivity : AppCompatActivity() {
 
     private fun validateInput(email: String, password: String): Boolean {
         var isValid = true
-
         if (email.isEmpty()) {
             binding.tilEmail.error = "Email is required"
             isValid = false
@@ -177,57 +169,83 @@ class AuthActivity : AppCompatActivity() {
             binding.tilPassword.error = "Password must be at least 6 characters"
             isValid = false
         }
-
         return isValid
     }
 
     private fun loginUser(email: String, password: String) {
-        binding.progressBar.visibility = android.view.View.VISIBLE
-        binding.btnPrimary.isEnabled = false
-
+        setLoadingState(true)
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
-                binding.progressBar.visibility = android.view.View.GONE
-                binding.btnPrimary.isEnabled = true
-
                 if (task.isSuccessful) {
-                    checkUserProfile()
+                    checkUserProfileAfterLogin()
                 } else {
-                    Toast.makeText(
-                        this,
-                        "Login failed: ${task.exception?.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    setLoadingState(false)
+                    Toast.makeText(this, "Login failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                 }
             }
     }
 
     private fun signupUser(email: String, password: String) {
-        binding.progressBar.visibility = android.view.View.VISIBLE
-        binding.btnPrimary.isEnabled = false
-
+        setLoadingState(true)
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
-                binding.progressBar.visibility = android.view.View.GONE
-                binding.btnPrimary.isEnabled = true
-
                 if (task.isSuccessful) {
-                    // Navigate to role selection
-                    val intent = Intent(this, RoleSelectionActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-                    finish()
+                    navigateToRoleSelection()
                 } else {
-                    Toast.makeText(
-                        this,
-                        "Signup failed: ${task.exception?.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    setLoadingState(false)
+                    Toast.makeText(this, "Signup failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                 }
             }
     }
 
-    private fun checkUserProfile() {
+    private fun firebaseAuthWithGoogle(account: GoogleSignInAccount) {
+        setLoadingState(true)
+        val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+        auth.signInWithCredential(credential)
+            .addOnCompleteListener(this) { task ->
+                if (task.isSuccessful) {
+                    val isNewUser = task.result?.additionalUserInfo?.isNewUser ?: false
+                    if (isNewUser) navigateToRoleSelection() else checkUserProfileAfterLogin()
+                } else {
+                    setLoadingState(false)
+                    Toast.makeText(this, "Authentication failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+    }
+
+    // ------------------------------------------------------------------------
+    // NAVIGATION & PROFILE CHECKS
+    // ------------------------------------------------------------------------
+
+    private fun checkUserProfileOnStartup() {
+        val userId = auth.currentUser?.uid ?: return
+
+        firestore.collection("users").document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val profileComplete = document.getBoolean("profileComplete") ?: false
+                    if (profileComplete) {
+                        // FIX: Redirect to specific Dashboard based on role
+                        navigateToDashboard(document.getString("userType") ?: "PATIENT")
+                    } else {
+                        // Profile incomplete, force logout to restart flow
+                        auth.signOut()
+                        setLoadingState(false)
+                    }
+                } else {
+                    auth.signOut()
+                    setLoadingState(false)
+                }
+            }
+            .addOnFailureListener {
+                auth.signOut()
+                setLoadingState(false)
+                Toast.makeText(this, "Session check failed. Please login again.", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun checkUserProfileAfterLogin() {
         val userId = auth.currentUser?.uid ?: return
 
         firestore.collection("users").document(userId)
@@ -238,31 +256,57 @@ class AuthActivity : AppCompatActivity() {
                     val userType = document.getString("userType") ?: "PATIENT"
 
                     if (profileComplete) {
-                        // Navigate to main app
-                        val intent = Intent(this, com.example.hospitalmanagement.MainActivity::class.java)
-                        intent.putExtra("USER_ID", userId)
-                        intent.putExtra("USER_ROLE", userType)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
+                        // FIX: Redirect to specific Dashboard
+                        navigateToDashboard(userType)
                     } else {
-                        // Navigate to profile setup
-                        val intent = Intent(this, ProfileSetupActivity::class.java)
-                        intent.putExtra("USER_TYPE", userType)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
+                        navigateToProfileSetup(userType)
                     }
                 } else {
-                    // No user document, navigate to role selection
-                    val intent = Intent(this, RoleSelectionActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-                    finish()
+                    navigateToRoleSelection()
                 }
             }
             .addOnFailureListener {
-                Toast.makeText(this, "Error checking profile", Toast.LENGTH_SHORT).show()
+                setLoadingState(false)
+                Toast.makeText(this, "Error fetching profile", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    /**
+     * UPDATED NAVIGATION LOGIC
+     * Routes users to DoctorDashboardActivity or PatientDashboardActivity
+     */
+    private fun navigateToDashboard(userRole: String) {
+        val userId = auth.currentUser?.uid ?: return
+
+        // Select the correct Activity Class based on role
+        val targetActivity = if (userRole == "DOCTOR") {
+            DoctorDashboardActivity::class.java
+        } else {
+            PatientDashboardActivity::class.java
+        }
+
+        val intent = Intent(this, targetActivity)
+        intent.putExtra("USER_ID", userId)
+        intent.putExtra("USER_ROLE", userRole)
+
+        // Clear back stack so user cannot return to login screen
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun navigateToRoleSelection() {
+        val intent = Intent(this, RoleSelectionActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun navigateToProfileSetup(userType: String) {
+        val intent = Intent(this, ProfileSetupActivity::class.java)
+        intent.putExtra("USER_TYPE", userType)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 }
