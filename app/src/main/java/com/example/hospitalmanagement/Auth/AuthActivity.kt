@@ -42,26 +42,18 @@ class AuthActivity : AppCompatActivity() {
         setupUI()
 
         // STARTUP CHECK:
-        // Hide the login form initially to prevent "flashing" for logged-in users.
         setLoadingState(true)
 
         if (auth.currentUser != null) {
-            // User is theoretically logged in, but let's check if they finished setup.
             checkUserProfileOnStartup()
         } else {
-            // No user found, show the login form immediately.
             setLoadingState(false)
         }
     }
 
-    /**
-     * Toggles visibility between the Login Form and the Loading Spinner.
-     */
     private fun setLoadingState(isLoading: Boolean) {
         if (isLoading) {
             binding.progressBar.visibility = View.VISIBLE
-
-            // Hide all form elements including the "OR" divider
             binding.tilEmail.visibility = View.GONE
             binding.tilPassword.visibility = View.GONE
             binding.btnPrimary.visibility = View.GONE
@@ -69,15 +61,9 @@ class AuthActivity : AppCompatActivity() {
             binding.tvToggleMode.visibility = View.GONE
             binding.tvTitle.visibility = View.GONE
             binding.tvSubtitle.visibility = View.GONE
-
-            // Note: Ensure your XML actually has an ID 'layoutDivider'.
-            // If you removed it in previous steps, remove this line.
             // binding.layoutDivider.visibility = View.GONE
-
         } else {
             binding.progressBar.visibility = View.GONE
-
-            // Show all form elements
             binding.tilEmail.visibility = View.VISIBLE
             binding.tilPassword.visibility = View.VISIBLE
             binding.btnPrimary.visibility = View.VISIBLE
@@ -85,7 +71,6 @@ class AuthActivity : AppCompatActivity() {
             binding.tvToggleMode.visibility = View.VISIBLE
             binding.tvTitle.visibility = View.VISIBLE
             binding.tvSubtitle.visibility = View.VISIBLE
-
             // binding.layoutDivider.visibility = View.VISIBLE
         }
     }
@@ -123,7 +108,11 @@ class AuthActivity : AppCompatActivity() {
             val password = binding.etPassword.text.toString().trim()
 
             if (validateInput(email, password)) {
-                if (isLoginMode) loginUser(email, password) else signupUser(email, password)
+                if (isLoginMode) {
+                    loginUser(email, password)
+                } else {
+                    signupUser(email, password)
+                }
             }
         }
 
@@ -161,7 +150,6 @@ class AuthActivity : AppCompatActivity() {
             binding.tilEmail.error = "Invalid email format"
             isValid = false
         }
-
         if (password.isEmpty()) {
             binding.tilPassword.error = "Password is required"
             isValid = false
@@ -226,10 +214,9 @@ class AuthActivity : AppCompatActivity() {
                 if (document.exists()) {
                     val profileComplete = document.getBoolean("profileComplete") ?: false
                     if (profileComplete) {
-                        // FIX: Redirect to specific Dashboard based on role
+                        // FIXED: Redirect to specific Dashboard based on role
                         navigateToDashboard(document.getString("userType") ?: "PATIENT")
                     } else {
-                        // Profile incomplete, force logout to restart flow
                         auth.signOut()
                         setLoadingState(false)
                     }
@@ -256,7 +243,7 @@ class AuthActivity : AppCompatActivity() {
                     val userType = document.getString("userType") ?: "PATIENT"
 
                     if (profileComplete) {
-                        // FIX: Redirect to specific Dashboard
+                        // FIXED: Redirect to specific Dashboard
                         navigateToDashboard(userType)
                     } else {
                         navigateToProfileSetup(userType)

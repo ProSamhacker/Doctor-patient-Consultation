@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.widget.ImageButton // Import ImageButton
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -40,7 +41,6 @@ class PatientDashboardActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // LINKING TO XML: Connects to your patient layout
         setContentView(R.layout.activity_patient_dashboard)
 
         userId = intent.getStringExtra("USER_ID") ?: ""
@@ -61,12 +61,24 @@ class PatientDashboardActivity : AppCompatActivity() {
     }
 
     private fun setupUI(savedInstanceState: Bundle?) {
-        // FIX: Use the IDs from activity_patient_dashboard.xml
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNavigationViewPatient)
         val fabMic = findViewById<FloatingActionButton>(R.id.fabMicPatient)
         val containerId = R.id.fragment_container_patient
 
-        // Safety check to prevent crashes if IDs change again
+        // --- SEARCH LOGIC START ---
+        val btnSearch = findViewById<ImageButton>(R.id.btnSearchPatient)
+        btnSearch.setOnClickListener {
+            // TODO: Implement search functionality
+        }
+        // --- SEARCH LOGIC END ---
+
+        // --- LOGOUT LOGIC START ---
+        val btnLogout = findViewById<ImageButton>(R.id.btnLogoutPatient)
+        btnLogout?.setOnClickListener {
+            performLogout()
+        }
+        // --- LOGOUT LOGIC END ---
+
         if (bottomNav == null || fabMic == null) {
             Toast.makeText(this, "Error: Dashboard views not found.", Toast.LENGTH_LONG).show()
             return
@@ -109,6 +121,14 @@ class PatientDashboardActivity : AppCompatActivity() {
             showEmergencyDialog()
             true
         }
+    }
+
+    private fun performLogout() {
+        FirebaseAuth.getInstance().signOut()
+        val intent = Intent(this, AuthActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 
     private fun showEmergencyDialog() {

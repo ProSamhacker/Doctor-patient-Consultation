@@ -25,7 +25,7 @@ android {
         buildConfigField(
             "String",
             "GEMINI_API_KEY",
-            "\"${project.findProperty("GEMINI_API_KEY") ?: "AIzaSyC97B02tPs5C2JCvtTLE46fVhD9YFcaRSE"}\""
+            "\"${project.findProperty("GEMINI_API_KEY") ?: "AIzaSyAP4E9kxbEJXCrzLwkQTdDNpFzwQ3Js9Ns"}\""
         )
         buildConfigField(
         "String",

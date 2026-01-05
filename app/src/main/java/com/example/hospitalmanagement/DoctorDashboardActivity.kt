@@ -2,6 +2,7 @@ package com.example.hospitalmanagement
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import com.example.hospitalmanagement.FRAGMENTS.AppointmentsFragment
@@ -21,18 +22,11 @@ class DoctorDashboardActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // LINKING TO XML: This line connects this class to your layout
         setContentView(R.layout.activity_doctor_dashboard)
 
-        // Get Data passed from AuthActivity
         userId = intent.getStringExtra("USER_ID") ?: ""
         userRole = intent.getStringExtra("USER_ROLE") ?: "DOCTOR"
 
-        setupDatabaseAndViewModel()
-        setupUI(savedInstanceState)
-    }
-
-    private fun setupDatabaseAndViewModel() {
         val database = AppDatabase.getDatabase(this)
         repository = HospitalRepository(
             database.doctorDao(), database.patientDao(), database.appointmentDao(),
@@ -42,19 +36,37 @@ class DoctorDashboardActivity : AppCompatActivity() {
         )
         val factory = MainViewModel.Factory(repository, userId, userRole)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
+
+        setupUI(savedInstanceState)
     }
 
     private fun setupUI(savedInstanceState: Bundle?) {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNavigationView)
 
-        // Load the Initial Fragment (Home)
+        // --- SEARCH LOGIC START ---
+        val btnSearch = findViewById<ImageButton>(R.id.btnSearchDoctor)
+        btnSearch.setOnClickListener {
+            // TODO: Implement search functionality
+            // For example, navigate to a SearchActivity or show a search dialog
+            // val intent = Intent(this, SearchActivity::class.java)
+            // startActivity(intent)
+        }
+        // --- SEARCH LOGIC END ---
+
+        // --- LOGOUT LOGIC START ---
+        val btnLogout = findViewById<ImageButton>(R.id.btnLogoutDoctor)
+        btnLogout.setOnClickListener {
+            performLogout()
+        }
+        // --- LOGOUT LOGIC END ---
+
+        // Load Initial Fragment
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, DoctorHomeFragment())
                 .commit()
         }
 
-        // Handle Bottom Navigation Clicks
         bottomNav.setOnItemSelectedListener { item ->
             val fragment = when (item.itemId) {
                 R.id.nav_home -> DoctorHomeFragment()
@@ -73,14 +85,15 @@ class DoctorDashboardActivity : AppCompatActivity() {
                 false
             }
         }
-
-        // Optional: Setup Logout if you added a button in your XML header
-        // findViewById<ImageButton>(R.id.btnLogout)?.setOnClickListener { performLogout() }
     }
 
     private fun performLogout() {
+        // 1. Sign out from Firebase
         FirebaseAuth.getInstance().signOut()
+
+        // 2. Return to Login Screen (AuthActivity)
         val intent = Intent(this, AuthActivity::class.java)
+        // Clear back stack so user can't press "Back" to return to dashboard
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
