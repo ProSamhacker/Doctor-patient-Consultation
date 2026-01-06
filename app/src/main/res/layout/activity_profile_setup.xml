@@ -9,6 +9,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#000000"
         android:orientation="vertical"
         android:padding="24dp">
 
@@ -17,88 +18,90 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Complete Your Profile"
+            android:textColor="#FFFFFF"
             android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="#333333"/>
+            android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Fill in your details to get started"
-            android:textSize="14sp"
-            android:textColor="#666666"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="24dp"/>
+            android:layout_marginBottom="24dp"
+            android:text="Fill in your details to get started"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
 
         <!-- Profile Image Selection -->
         <LinearLayout
             android:id="@+id/layoutSelectImage"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
             android:layout_marginBottom="24dp"
+            android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:gravity="center"
+            android:orientation="vertical">
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="120dp"
                 android:layout_height="120dp"
                 app:cardCornerRadius="60dp"
                 app:cardElevation="4dp"
-                app:strokeWidth="2dp"
-                app:strokeColor="#4A90E2">
+                app:strokeColor="#4A90E2"
+                app:strokeWidth="2dp">
 
                 <ImageView
                     android:id="@+id/ivProfileImage"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:src="@drawable/ic_avatar"
                     android:scaleType="centerCrop"
-                    app:tint="#CCCCCC"/>
+                    android:src="@drawable/ic_avatar"
+                    app:tint="#CCCCCC" />
             </com.google.android.material.card.MaterialCardView>
 
             <TextView
                 android:id="@+id/tvSelectImage"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Add Profile Photo"
-                android:textSize="14sp"
-                android:textColor="#4A90E2"
-                android:textStyle="bold"
                 android:layout_marginTop="12dp"
                 android:drawableStart="@drawable/ic_camera"
                 android:drawablePadding="8dp"
-                android:drawableTint="#4A90E2"/>
+                android:drawableTint="#4A90E2"
+                android:text="Add Profile Photo"
+                android:textColor="#4A90E2"
+                android:textSize="14sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <!-- Common Fields -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilName"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Full Name"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+            android:hint="Full Name">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textPersonName"/>
+                android:inputType="textPersonName" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilPhone"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Phone Number"
             android:layout_marginTop="16dp"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+            android:hint="Phone Number">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etPhone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="phone"/>
+                android:inputType="phone" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Doctor-Specific Fields -->
@@ -111,92 +114,99 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilSpecialization"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Specialization"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Specialization">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etSpecialization"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilHospital"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Hospital/Clinic Name"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Hospital/Clinic Name">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etHospital"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Experience (years)"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Experience (years)">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etExperience"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="number"/>
+                    android:inputType="number" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Qualifications (comma separated)"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Qualifications (comma separated)">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etQualifications"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Medical License Number"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Medical License Number">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etLicense"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Consultation Fee (₹)"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Consultation Fee (₹)">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etFee"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"/>
+                    android:inputType="numberDecimal" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Bio"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Bio">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etBio"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minLines="3"
-                    android:gravity="top"/>
+                    android:gravity="top"
+                    android:minLines="3" />
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
@@ -210,98 +220,106 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilAge"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Age"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Age">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etAge"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="number"/>
+                    android:inputType="number" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Gender"
-                android:textSize="14sp"
-                android:textColor="#666666"
                 android:layout_marginTop="16dp"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="8dp"
+                android:text="Gender"
+                android:textColor="#666666"
+                android:textSize="14sp" />
 
             <RadioGroup
                 android:id="@+id/rgGender"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
+
                 <RadioButton
                     android:id="@+id/rbMale"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Male"
-                    android:layout_marginEnd="24dp"/>
+                    android:layout_marginEnd="24dp"
+                    android:text="Male" />
+
                 <RadioButton
                     android:id="@+id/rbFemale"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Female"
-                    android:layout_marginEnd="24dp"/>
+                    android:layout_marginEnd="24dp"
+                    android:text="Female" />
+
                 <RadioButton
                     android:id="@+id/rbOther"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Other"/>
+                    android:text="Other" />
             </RadioGroup>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Blood Group"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Blood Group">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etBloodGroup"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Address"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Address">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etAddress"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minLines="2"/>
+                    android:minLines="2" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Known Allergies (comma separated)"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Known Allergies (comma separated)">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etAllergies"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Chronic Conditions (comma separated)"
                 android:layout_marginTop="16dp"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:hint="Chronic Conditions (comma separated)">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etConditions"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
@@ -311,18 +329,18 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:layout_marginTop="24dp"
-            android:visibility="gone"/>
+            android:visibility="gone" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSave"
             android:layout_width="match_parent"
             android:layout_height="56dp"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="24dp"
             android:text="Save &amp; Continue"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:layout_marginTop="32dp"
-            android:layout_marginBottom="24dp"
-            app:cornerRadius="12dp"
-            app:backgroundTint="#4A90E2"/>
+            app:backgroundTint="#4A90E2"
+            app:cornerRadius="12dp" />
     </LinearLayout>
 </ScrollView>

@@ -4,10 +4,11 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F1F8E9"> <ScrollView
+    android:background="#F1F8E9">
+
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheetVoice"
         app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
@@ -36,9 +37,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
+                app:cardBackgroundColor="@color/white"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/white">
+                app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -57,57 +58,59 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="Daily Medications"
+                            android:textColor="#333"
                             android:textSize="20sp"
-                            android:textStyle="bold"
-                            android:textColor="#333" />
+                            android:textStyle="bold" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnReadPrescription"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            style="@style/Widget.MaterialComponents.Button.TextButton"
                             android:text="Read Aloud"
                             android:textColor="#388E3C"
                             app:icon="@drawable/ic_play"
-                            app:iconTint="#388E3C"/>
+                            app:iconTint="#388E3C" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="#EEE"
-                        android:layout_marginVertical="8dp"/>
+                        android:layout_marginVertical="8dp"
+                        android:background="#EEE" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-                        
+                        android:layout_marginBottom="12dp"
+                        android:orientation="horizontal">
+
                         <TextView
                             android:layout_width="60dp"
                             android:layout_height="wrap_content"
                             android:text="08:00 AM"
-                            android:textStyle="bold"
-                            android:textColor="#388E3C"/>
-                        
+                            android:textColor="#388E3C"
+                            android:textStyle="bold" />
+
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:layout_marginStart="12dp">
+                            android:layout_marginStart="12dp"
+                            android:orientation="vertical">
+
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Amoxicillin 500mg"
-                                android:textSize="16sp"
-                                android:textColor="#000"/>
+                                android:textColor="#000"
+                                android:textSize="16sp" />
+
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Take with food"
-                                android:textSize="12sp"
-                                android:textColor="#666"/>
+                                android:textColor="#666"
+                                android:textSize="12sp" />
                         </LinearLayout>
                     </LinearLayout>
 
@@ -115,68 +118,73 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal">
-                        
+
                         <TextView
                             android:layout_width="60dp"
                             android:layout_height="wrap_content"
                             android:text="02:00 PM"
-                            android:textStyle="bold"
-                            android:textColor="#388E3C"/>
-                        
+                            android:textColor="#388E3C"
+                            android:textStyle="bold" />
+
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:layout_marginStart="12dp">
+                            android:layout_marginStart="12dp"
+                            android:orientation="vertical">
+
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Paracetamol"
-                                android:textSize="16sp"
-                                android:textColor="#000"/>
-                             <TextView
+                                android:textColor="#000"
+                                android:textSize="16sp" />
+
+                            <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="If fever persists"
-                                android:textSize="12sp"
-                                android:textColor="#666"/>
+                                android:textColor="#666"
+                                android:textSize="12sp" />
                         </LinearLayout>
                     </LinearLayout>
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-            
+
             <GridLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:columnCount="2"
-                android:layout_marginTop="24dp">
-                
+                android:layout_marginTop="24dp"
+                android:columnCount="2">
+
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
                     android:layout_columnWeight="1"
                     android:layout_marginEnd="8dp"
                     android:layout_marginBottom="16dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="#E8F5E9">
+                    app:cardBackgroundColor="#E8F5E9"
+                    app:cardCornerRadius="12dp">
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:gravity="center"
                         android:orientation="vertical">
+
                         <ImageView
                             android:layout_width="40dp"
                             android:layout_height="40dp"
                             android:src="@drawable/ic_prescription"
-                            app:tint="#2E7D32"/>
+                            app:tint="#2E7D32" />
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="My Records"
                             android:layout_marginTop="8dp"
+                            android:text="My Records"
                             android:textColor="#2E7D32"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -186,68 +194,33 @@
                     android:layout_columnWeight="1"
                     android:layout_marginStart="8dp"
                     android:layout_marginBottom="16dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="#E8F5E9">
+                    app:cardBackgroundColor="#E8F5E9"
+                    app:cardCornerRadius="12dp">
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:gravity="center"
                         android:orientation="vertical">
+
                         <ImageView
                             android:layout_width="40dp"
                             android:layout_height="40dp"
                             android:src="@drawable/ic_calendar"
-                            app:tint="#2E7D32"/>
+                            app:tint="#2E7D32" />
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Book Visit"
                             android:layout_marginTop="8dp"
+                            android:text="Book Visit"
                             android:textColor="#2E7D32"
-                            android:textStyle="bold"/>
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </GridLayout>
 
         </LinearLayout>
     </ScrollView>
-
-    <LinearLayout
-        android:id="@+id/bottomSheetVoice"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/header_background" 
-        android:backgroundTint="#388E3C"
-        android:padding="24dp"
-        android:gravity="center"
-        android:orientation="vertical"
-        app:layout_constraintBottom_toBottomOf="parent">
-
-        <TextView
-            android:id="@+id/tvVoicePrompt"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Tap to Speak"
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:layout_marginBottom="16dp"/>
-
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabMicPatient"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/ic_mic"
-            app:backgroundTint="@color/white"
-            app:tint="#388E3C"
-            app:fabSize="normal" />
-            
-         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Try 'Read my prescription'"
-            android:textColor="#C8E6C9"
-            android:textSize="12sp"
-            android:layout_marginTop="12dp"/>
-    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

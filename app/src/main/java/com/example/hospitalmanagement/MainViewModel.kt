@@ -1,6 +1,7 @@
 package com.example.hospitalmanagement
 
 import androidx.lifecycle.*
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -9,6 +10,9 @@ class MainViewModel(
     private val userId: String,
     private val userRole: String
 ) : ViewModel() {
+
+    // Firestore instance for data syncing
+    private val firestore = FirebaseFirestore.getInstance()
 
     // Current user data
     private val _currentDoctor = MutableLiveData<Doctor?>()
@@ -72,14 +76,99 @@ class MainViewModel(
         loadUserData()
     }
 
+    /**
+     * UPDATED: Smart Profile Loading
+     * 1. Check Local Database (Fast, Offline)
+     * 2. If empty, Fetch from Firebase (Sync) & Save to Local
+     */
     private fun loadUserData() {
         viewModelScope.launch {
-            if (userRole == "DOCTOR") {
-                _currentDoctor.value = repository.getDoctor(userId)
-            } else {
-                _currentPatient.value = repository.getPatient(userId)
+            _isLoading.value = true
+            try {
+                if (userRole == "DOCTOR") {
+                    val localDoctor = repository.getDoctor(userId)
+                    if (localDoctor != null) {
+                        _currentDoctor.value = localDoctor
+                    } else {
+                        fetchDoctorFromFirebase()
+                    }
+                } else {
+                    val localPatient = repository.getPatient(userId)
+                    if (localPatient != null) {
+                        _currentPatient.value = localPatient
+                    } else {
+                        fetchPatientFromFirebase()
+                    }
+                }
+            } catch (e: Exception) {
+                _messages.value = "Error loading profile: ${e.message}"
+            } finally {
+                _isLoading.value = false
             }
         }
+    }
+
+    private fun fetchDoctorFromFirebase() {
+        firestore.collection("doctors").document(userId).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val doctor = Doctor(
+                        doctorId = userId,
+                        name = document.getString("name") ?: "N/A",
+                        specialization = document.getString("specialization") ?: "General",
+                        phone = document.getString("phone") ?: "",
+                        email = document.getString("email") ?: "",
+                        hospitalName = document.getString("hospitalName") ?: "",
+                        profileImageUrl = document.getString("profileImageUrl") ?: "",
+                        experienceYears = document.getLong("experience")?.toInt() ?: 0,
+                        consultationFee = document.getDouble("consultationFee") ?: 0.0,
+                        rating = 0f,
+                        isActive = true
+                    )
+
+                    // 1. Update UI
+                    _currentDoctor.value = doctor
+
+                    // 2. Save to Local Room DB for next time
+                    viewModelScope.launch { repository.insertDoctor(doctor) }
+                }
+            }
+            .addOnFailureListener {
+                _messages.value = "Failed to sync profile: ${it.message}"
+            }
+    }
+
+    private fun fetchPatientFromFirebase() {
+        firestore.collection("patients").document(userId).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val allergies = document.get("allergies") as? List<String> ?: emptyList()
+                    val conditions = document.get("chronicConditions") as? List<String> ?: emptyList()
+
+                    val patient = Patient(
+                        patientId = userId,
+                        name = document.getString("name") ?: "N/A",
+                        age = document.getLong("age")?.toInt() ?: 0,
+                        gender = document.getString("gender") ?: "Other",
+                        phone = document.getString("phone") ?: "",
+                        email = document.getString("email") ?: "",
+                        bloodGroup = document.getString("bloodGroup") ?: "",
+                        address = document.getString("address") ?: "",
+                        profileImageUrl = document.getString("profileImageUrl") ?: "",
+                        allergies = allergies,
+                        chronicConditions = conditions
+                    )
+
+                    // 1. Update UI
+                    _currentPatient.value = patient
+
+                    // 2. Save to Local Room DB for next time
+                    viewModelScope.launch { repository.insertPatient(patient) }
+                }
+            }
+            .addOnFailureListener {
+                _messages.value = "Failed to sync profile: ${it.message}"
+            }
     }
 
     // Appointment operations

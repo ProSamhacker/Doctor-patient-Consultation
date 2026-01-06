@@ -23,6 +23,8 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 
 class PatientDashboardActivity : AppCompatActivity() {
 
@@ -122,13 +124,22 @@ class PatientDashboardActivity : AppCompatActivity() {
             true
         }
     }
-
     private fun performLogout() {
-        FirebaseAuth.getInstance().signOut()
-        val intent = Intent(this, AuthActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
+        // 1. Configure Google Sign In options (just to get the client)
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+        val googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+        // 2. Sign out of Google Client FIRST
+        googleSignInClient.signOut().addOnCompleteListener(this) {
+            // 3. Then Sign out of Firebase
+            FirebaseAuth.getInstance().signOut()
+
+            // 4. Return to Login Screen
+            val intent = Intent(this, AuthActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
     }
 
     private fun showEmergencyDialog() {

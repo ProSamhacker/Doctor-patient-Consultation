@@ -12,6 +12,8 @@ import com.example.hospitalmanagement.FRAGMENTS.ProfileFragment
 import com.example.hospitalmanagement.auth.AuthActivity
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 
 class DoctorDashboardActivity : AppCompatActivity() {
 
@@ -88,14 +90,20 @@ class DoctorDashboardActivity : AppCompatActivity() {
     }
 
     private fun performLogout() {
-        // 1. Sign out from Firebase
-        FirebaseAuth.getInstance().signOut()
+        // 1. Configure Google Sign In options
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+        val googleSignInClient = GoogleSignIn.getClient(this, gso)
 
-        // 2. Return to Login Screen (AuthActivity)
-        val intent = Intent(this, AuthActivity::class.java)
-        // Clear back stack so user can't press "Back" to return to dashboard
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
+        // 2. Sign out of Google Client
+        googleSignInClient.signOut().addOnCompleteListener(this) {
+            // 3. Sign out of Firebase
+            FirebaseAuth.getInstance().signOut()
+
+            // 4. Navigate back to Auth
+            val intent = Intent(this, AuthActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
     }
 }
