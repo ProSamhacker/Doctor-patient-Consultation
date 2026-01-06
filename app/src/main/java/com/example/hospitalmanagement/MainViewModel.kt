@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainViewModel(
-    private val repository: HospitalRepository,
+    val repository: HospitalRepository,
     private val userId: String,
     private val userRole: String
 ) : ViewModel() {
