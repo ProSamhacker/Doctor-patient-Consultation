@@ -10,25 +10,33 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog // Added Import
+import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager  // ADDED
+import androidx.recyclerview.widget.RecyclerView        // ADDED
+import com.example.hospitalmanagement.ADAPTER.NotificationAdapter // ADDED
 import com.example.hospitalmanagement.AppointmentStatus
 import com.example.hospitalmanagement.MainViewModel
-import com.example.hospitalmanagement.MedicalExtractionResult // Ensure this data class is available
+import com.example.hospitalmanagement.MedicalExtractionResult
 import com.example.hospitalmanagement.R
 import com.example.hospitalmanagement.VoiceRecognitionService
 import kotlinx.coroutines.launch
 
 class DoctorHomeFragment : Fragment() {
+    // --- Existing UI Variables ---
     private var tvLiveTranscript: TextView? = null
     private var tvDoctorName: TextView? = null
     private var tvScheduleCount: TextView? = null
     private var btnMic: ImageButton? = null
     private var tvStatus: TextView? = null
+
+    // --- New Notification Variables ---
+    private lateinit var rvNotifications: RecyclerView
+    private lateinit var notificationAdapter: NotificationAdapter
 
     private lateinit var viewModel: MainViewModel
     private var voiceService: VoiceRecognitionService? = null
@@ -42,21 +50,63 @@ class DoctorHomeFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_doctor_home, container, false)
 
-        // Initialize Views
+        // 1. Initialize Standard Views
         tvLiveTranscript = view.findViewById(R.id.tvLiveTranscript)
         tvDoctorName = view.findViewById(R.id.tvDoctorName)
         tvScheduleCount = view.findViewById(R.id.tvScheduleCount)
         btnMic = view.findViewById(R.id.btnMic)
         tvStatus = view.findViewById(R.id.tvStatus)
 
+        // 2. Initialize Notification RecyclerView
+        rvNotifications = view.findViewById(R.id.rvNotifications)
+        rvNotifications.layoutManager = LinearLayoutManager(requireContext())
+
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
+        // 3. Setup Notification Adapter with Action Callbacks
+        notificationAdapter = NotificationAdapter(
+            notifications = emptyList(),
+            onNotificationClick = { notification ->
+                // Optional: Handle click (e.g., expand details)
+            },
+            onActionClick = { notification, isAccepted ->
+                // Call ViewModel to process Accept/Reject logic
+                viewModel.handleAppointmentAction(notification, isAccepted)
+            }
+        )
+        rvNotifications.adapter = notificationAdapter
+
+        // 4. Setup Voice & Data
         setupVoiceService()
         setupMicButton()
         observeData()
 
         return view
     }
+
+    private fun observeData() {
+        // Observe Doctor Profile
+        viewModel.currentDoctor.observe(viewLifecycleOwner) { doctor ->
+            doctor?.let { tvDoctorName?.text = it.name }
+        }
+
+        // Observe Appointment Count
+        viewModel.upcomingAppointments.observe(viewLifecycleOwner) { appointments ->
+            val count = appointments.count { it.status == AppointmentStatus.SCHEDULED }
+            tvScheduleCount?.text = "$count Appointments Remaining"
+        }
+
+        // Observe Notifications (UPDATED)
+        viewModel.notifications.observe(viewLifecycleOwner) { notifications ->
+            notificationAdapter.updateData(notifications)
+            // Hide RecyclerView if no notifications to save space
+            rvNotifications.visibility = if (notifications.isNotEmpty()) View.VISIBLE else View.GONE
+        }
+    }
+
+    // =========================================================================
+    // VOICE & AI LOGIC (Unchanged)
+    // =========================================================================
 
     private fun setupVoiceService() {
         voiceService = VoiceRecognitionService(
@@ -67,7 +117,6 @@ class DoctorHomeFragment : Fragment() {
             onError = { error ->
                 activity?.runOnUiThread {
                     tvStatus?.text = error
-                    // Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
                     updateMicButton(false)
                 }
             }
@@ -96,11 +145,11 @@ class DoctorHomeFragment : Fragment() {
         viewModel.startConsultation(1) // Using dummy appointment ID
         currentSessionTranscript.clear()
         isRecordingSession = true
-        
+
         updateMicButton(true)
         tvStatus?.text = "Recording Session..."
         tvLiveTranscript?.text = "Listening..."
-        
+
         startListening()
     }
 
@@ -116,7 +165,7 @@ class DoctorHomeFragment : Fragment() {
         voiceService?.stopListening()
         updateMicButton(false)
         tvStatus?.text = "Processing..."
-        
+
         val transcript = currentSessionTranscript.toString()
         if (transcript.isNotBlank()) {
             processConsultation(transcript)
@@ -131,10 +180,10 @@ class DoctorHomeFragment : Fragment() {
                 currentSessionTranscript.append(" ")
             }
             currentSessionTranscript.append(text)
-            
+
             updateTranscript(currentSessionTranscript.toString())
             viewModel.addToTranscript(text)
-            
+
             if (isRecordingSession) {
                 // Delay to restart listening (simulating continuous listening)
                 btnMic?.postDelayed({
@@ -150,8 +199,7 @@ class DoctorHomeFragment : Fragment() {
         lifecycleScope.launch {
             try {
                 tvStatus?.text = "AI Analyzing..."
-                
-                // Use ViewModel instead of direct Repository
+
                 viewModel.extractMedicalInfo(transcript) { result ->
                     activity?.runOnUiThread {
                         showPrescriptionDialog(result)
@@ -167,17 +215,13 @@ class DoctorHomeFragment : Fragment() {
     }
 
     private fun showPrescriptionDialog(data: MedicalExtractionResult) {
-        // Inflate the custom dialog layout
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_medication, null)
-        
+
         val etDiagnosis = dialogView.findViewById<EditText>(R.id.etDiagnosis)
         val etMedication = dialogView.findViewById<EditText>(R.id.etMedicationName)
-        // Check if these IDs exist in your dialog_add_medication.xml. 
-        // If not, you might need to adjust the IDs here or in the XML.
 
         // Auto-fill fields from AI result
         etDiagnosis?.setText(data.diagnosis)
-        // Take the first medication if available
         if (data.medications.isNotEmpty()) {
             etMedication?.setText(data.medications[0].name)
         }
@@ -186,7 +230,6 @@ class DoctorHomeFragment : Fragment() {
             .setTitle("🤖 AI Auto-Draft")
             .setView(dialogView)
             .setPositiveButton("Verify & Send") { _, _ ->
-                // Save logic here (e.g., viewModel.createPrescription(...))
                 Toast.makeText(context, "Prescription Sent!", Toast.LENGTH_SHORT).show()
                 updateTranscript("Prescription sent for: ${data.diagnosis}")
             }
@@ -205,16 +248,6 @@ class DoctorHomeFragment : Fragment() {
         } else {
             btnMic?.setColorFilter(ContextCompat.getColor(requireContext(), android.R.color.white))
             btnMic?.setImageResource(R.drawable.ic_mic)
-        }
-    }
-
-    private fun observeData() {
-        viewModel.currentDoctor.observe(viewLifecycleOwner) { doctor ->
-            doctor?.let { tvDoctorName?.text = it.name }
-        }
-        viewModel.upcomingAppointments.observe(viewLifecycleOwner) { appointments ->
-            val count = appointments.count { it.status == AppointmentStatus.SCHEDULED }
-            tvScheduleCount?.text = "$count Appointments Remaining"
         }
     }
 

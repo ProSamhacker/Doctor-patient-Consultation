@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.hospitalmanagement.ADAPTER.DoctorSearchAdapter
+import com.example.hospitalmanagement.ADAPTER.PatientSearchAdapter
 import com.example.hospitalmanagement.databinding.ActivitySearchBinding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -21,7 +22,11 @@ class SearchActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySearchBinding
     private lateinit var viewModel: MainViewModel
-    private lateinit var adapter: DoctorSearchAdapter
+
+    // Adapters
+    private lateinit var doctorAdapter: DoctorSearchAdapter
+    private lateinit var patientAdapter: PatientSearchAdapter
+
     private var searchJob: Job? = null
     private var userRole: String = "PATIENT"
     private var userId: String = ""
@@ -48,22 +53,33 @@ class SearchActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        // Back button
         binding.btnBack.setOnClickListener { finish() }
 
-        // Setup RecyclerView
-        adapter = DoctorSearchAdapter(emptyList()) { doctor ->
-            // Navigate to booking
-            val intent = Intent(this, BookAppointmentActivity::class.java)
-            intent.putExtra("DOCTOR_ID", doctor.doctorId)
-            intent.putExtra("DOCTOR_NAME", doctor.name)
-            intent.putExtra("USER_ID", userId)
-            startActivity(intent)
-        }
         binding.rvSearchResults.layoutManager = LinearLayoutManager(this)
-        binding.rvSearchResults.adapter = adapter
 
-        // Search input
+        if (userRole == "PATIENT") {
+            // Patient searching for Doctors
+            doctorAdapter = DoctorSearchAdapter(emptyList()) { doctor ->
+                val intent = Intent(this, BookAppointmentActivity::class.java)
+                intent.putExtra("DOCTOR_ID", doctor.doctorId)
+                intent.putExtra("DOCTOR_NAME", doctor.name)
+                intent.putExtra("USER_ID", userId)
+                startActivity(intent)
+            }
+            binding.rvSearchResults.adapter = doctorAdapter
+            binding.etSearch.hint = "Search doctors, specialization..."
+            loadAllDoctors() // Show initial list
+        } else {
+            // Doctor searching for Patients
+            patientAdapter = PatientSearchAdapter(emptyList()) { patient ->
+                Toast.makeText(this, "Selected: ${patient.name}", Toast.LENGTH_SHORT).show()
+                // You can add navigation to Patient Details here if needed
+            }
+            binding.rvSearchResults.adapter = patientAdapter
+            binding.etSearch.hint = "Search patients by name..."
+        }
+
+        // Search input listener
         binding.etSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -75,11 +91,6 @@ class SearchActivity : AppCompatActivity() {
                 }
             }
         })
-
-        // Show initial list (if user is PATIENT, show all active doctors)
-        if (userRole == "PATIENT") {
-            loadAllDoctors()
-        }
     }
 
     private fun loadAllDoctors() {
@@ -88,13 +99,12 @@ class SearchActivity : AppCompatActivity() {
             try {
                 val doctors = viewModel.repository.getAllActiveDoctors().first()
                 binding.progressBar.visibility = View.GONE
+
                 if (doctors.isEmpty()) {
-                    binding.tvEmptyState.visibility = View.VISIBLE
-                    binding.rvSearchResults.visibility = View.GONE
+                    showEmptyState(true)
                 } else {
-                    binding.tvEmptyState.visibility = View.GONE
-                    binding.rvSearchResults.visibility = View.VISIBLE
-                    adapter.updateData(doctors)
+                    showEmptyState(false)
+                    doctorAdapter.updateData(doctors)
                 }
             } catch (e: Exception) {
                 binding.progressBar.visibility = View.GONE
@@ -107,6 +117,10 @@ class SearchActivity : AppCompatActivity() {
         if (query.isBlank()) {
             if (userRole == "PATIENT") {
                 loadAllDoctors()
+            } else {
+                // Clear list for doctors if search is empty
+                patientAdapter.updateData(emptyList())
+                showEmptyState(false)
             }
             return
         }
@@ -114,29 +128,42 @@ class SearchActivity : AppCompatActivity() {
         binding.progressBar.visibility = View.VISIBLE
         lifecycleScope.launch {
             try {
-                val results = if (userRole == "PATIENT") {
-                    viewModel.repository.searchDoctors(query).first()
+                // Polymorphic search based on Role
+                if (userRole == "PATIENT") {
+                    val results = viewModel.repository.searchDoctors(query).first()
+                    binding.progressBar.visibility = View.GONE
+
+                    if (results.isEmpty()) {
+                        showEmptyState(true)
+                    } else {
+                        showEmptyState(false)
+                        doctorAdapter.updateData(results)
+                    }
                 } else {
-                    viewModel.repository.searchPatients(query).first()
-                }
+                    val results = viewModel.repository.searchPatients(query).first()
+                    binding.progressBar.visibility = View.GONE
 
-                binding.progressBar.visibility = View.GONE
-
-                if (results.isEmpty()) {
-                    binding.tvEmptyState.visibility = View.VISIBLE
-                    binding.rvSearchResults.visibility = View.GONE
-                } else {
-                    binding.tvEmptyState.visibility = View.GONE
-                    binding.rvSearchResults.visibility = View.VISIBLE
-
-                    if (results.first() is Doctor) {
-                        adapter.updateData(results.filterIsInstance<Doctor>())
+                    if (results.isEmpty()) {
+                        showEmptyState(true)
+                    } else {
+                        showEmptyState(false)
+                        patientAdapter.updateData(results)
                     }
                 }
             } catch (e: Exception) {
                 binding.progressBar.visibility = View.GONE
                 Toast.makeText(this@SearchActivity, "Search failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    private fun showEmptyState(show: Boolean) {
+        if (show) {
+            binding.tvEmptyState.visibility = View.VISIBLE
+            binding.rvSearchResults.visibility = View.GONE
+        } else {
+            binding.tvEmptyState.visibility = View.GONE
+            binding.rvSearchResults.visibility = View.VISIBLE
         }
     }
 }

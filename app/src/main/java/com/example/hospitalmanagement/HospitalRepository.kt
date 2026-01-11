@@ -66,32 +66,37 @@ class HospitalRepository(
     fun searchPatients(query: String) = patientDao.searchPatients(query)
 
     // ===== Appointment Operations =====
+    // In HospitalRepository.kt
+
     suspend fun createAppointment(appointment: Appointment): Long {
         val appId = appointmentDao.insert(appointment)
         val doctor = doctorDao.getById(appointment.doctorId)
         val patient = patientDao.getById(appointment.patientId)
 
+        // Notify Doctor: "Appointment Request"
         doctor?.let {
             notificationDao.insert(
                 NotificationEntity(
                     userId = it.doctorId,
                     userType = "DOCTOR",
-                    title = "New Appointment",
-                    message = "New appointment with ${patient?.name ?: "patient"}",
-                    type = NotificationType.APPOINTMENT_CONFIRMED,
+                    // CHANGED: Title and Type
+                    title = "Appointment Request",
+                    message = "${patient?.name ?: "A patient"} has requested an appointment.",
+                    type = NotificationType.INFO, // Using INFO as a generic "Action Needed" type
                     relatedId = appId.toInt()
                 )
             )
         }
 
+        // Notify Patient: "Request Sent"
         patient?.let {
             notificationDao.insert(
                 NotificationEntity(
                     userId = it.patientId,
                     userType = "PATIENT",
-                    title = "Appointment Confirmed",
-                    message = "Your appointment with ${doctor?.name ?: "doctor"} is confirmed",
-                    type = NotificationType.APPOINTMENT_CONFIRMED,
+                    title = "Request Sent",
+                    message = "Your appointment request has been sent to Dr. ${doctor?.name}.",
+                    type = NotificationType.INFO,
                     relatedId = appId.toInt()
                 )
             )

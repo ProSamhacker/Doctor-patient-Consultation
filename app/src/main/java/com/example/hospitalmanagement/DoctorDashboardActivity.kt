@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.example.hospitalmanagement.FRAGMENTS.AppointmentsFragment
 import com.example.hospitalmanagement.FRAGMENTS.DoctorHomeFragment
 import com.example.hospitalmanagement.FRAGMENTS.MessagesFragment
@@ -14,6 +15,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import kotlinx.coroutines.launch
 
 class DoctorDashboardActivity : AppCompatActivity() {
 
@@ -38,20 +40,53 @@ class DoctorDashboardActivity : AppCompatActivity() {
         )
         val factory = MainViewModel.Factory(repository, userId, userRole)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
+        AppointmentScheduler.startMonitoring(
+            context = this,
+            scope = lifecycleScope,
+            repository = viewModel.repository, // Access repo via ViewModel or create new instance
+            userId = userId,
+            userRole = "DOCTOR"
+        )
 
         setupUI(savedInstanceState)
     }
-
+    override fun onDestroy() {
+        super.onDestroy()
+        AppointmentScheduler.stopMonitoring()
+    }
     private fun setupUI(savedInstanceState: Bundle?) {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNavigationView)
-
+        // Inside setupUI or onCreate of Dashboard
+        lifecycleScope.launch {
+            // Poll every minute
+            while (true) {
+                val now = System.currentTimeMillis()
+                // Simple check: Look for accepted appointments +/- 1 minute from now
+                viewModel.allAppointments.value?.find { appt ->
+                    val diff = Math.abs(appt.dateTime - now)
+                    // 60000ms = 1 minute tolerance
+                    diff < 60000 && appt.status == AppointmentStatus.SCHEDULED
+                }?.let { appointment ->
+                    // Found a meeting starting NOW
+                    AppointmentScheduler.triggerMeetingNotification(
+                        this@DoctorDashboardActivity, // or PatientDashboardActivity
+                        appointment.appId,
+                        userId,
+                        userRole
+                    )
+                    // Prevent spamming
+                    kotlinx.coroutines.delay(60000)
+                }
+                kotlinx.coroutines.delay(30000) // Check every 30 seconds
+            }
+        }
         // --- SEARCH LOGIC START ---
         val btnSearch = findViewById<ImageButton>(R.id.btnSearchDoctor)
         btnSearch.setOnClickListener {
-            // TODO: Implement search functionality
-            // For example, navigate to a SearchActivity or show a search dialog
-            // val intent = Intent(this, SearchActivity::class.java)
-            // startActivity(intent)
+            val intent = Intent(this, SearchActivity::class.java)
+            intent.putExtra("USER_ID", userId)
+            intent.putExtra("USER_ROLE", userRole)
+            startActivity(intent)
         }
         // --- SEARCH LOGIC END ---
 

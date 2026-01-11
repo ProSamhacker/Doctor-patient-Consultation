@@ -1,8 +1,11 @@
 package com.example.hospitalmanagement.ADAPTER
+
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.hospitalmanagement.NotificationEntity
@@ -11,9 +14,12 @@ import com.example.hospitalmanagement.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
 class NotificationAdapter(
     private var notifications: List<NotificationEntity>,
-    private val onNotificationClick: (NotificationEntity) -> Unit
+    private val onNotificationClick: (NotificationEntity) -> Unit,
+    // New callback for actions
+    private val onActionClick: (NotificationEntity, Boolean) -> Unit // Boolean: true = Accept, false = Reject
 ) : RecyclerView.Adapter<NotificationAdapter.ViewHolder>() {
 
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -22,6 +28,11 @@ class NotificationAdapter(
         val tvTime: TextView = view.findViewById(R.id.tvNotificationTime)
         val ivIcon: ImageView = view.findViewById(R.id.ivNotificationIcon)
         val vUnreadIndicator: View = view.findViewById(R.id.vUnreadIndicator)
+
+        // Action views
+        val layoutActions: LinearLayout = view.findViewById(R.id.layoutActions)
+        val btnAccept: Button = view.findViewById(R.id.btnAccept)
+        val btnReject: Button = view.findViewById(R.id.btnReject)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -36,8 +47,9 @@ class NotificationAdapter(
         holder.tvTitle.text = notification.title
         holder.tvMessage.text = notification.message
         holder.tvTime.text = formatTime(notification.timestamp)
+        holder.vUnreadIndicator.visibility = if (notification.isRead) View.GONE else View.VISIBLE
 
-        // Set icon based on notification type
+        // Icon Logic
         holder.ivIcon.setImageResource(when (notification.type) {
             NotificationType.APPOINTMENT_REMINDER -> R.drawable.ic_calendar
             NotificationType.APPOINTMENT_CONFIRMED -> R.drawable.ic_check
@@ -49,8 +61,21 @@ class NotificationAdapter(
             NotificationType.INFO -> R.drawable.ic_info
         })
 
-        // Show/hide unread indicator
-        holder.vUnreadIndicator.visibility = if (notification.isRead) View.GONE else View.VISIBLE
+        // --- ACTION LOGIC ---
+        // Show buttons only if title is "Appointment Request" and it hasn't been handled (read)
+        if (notification.title == "Appointment Request" && !notification.isRead) {
+            holder.layoutActions.visibility = View.VISIBLE
+
+            holder.btnAccept.setOnClickListener {
+                onActionClick(notification, true)
+            }
+
+            holder.btnReject.setOnClickListener {
+                onActionClick(notification, false)
+            }
+        } else {
+            holder.layoutActions.visibility = View.GONE
+        }
 
         holder.itemView.setOnClickListener { onNotificationClick(notification) }
     }
@@ -65,15 +90,11 @@ class NotificationAdapter(
     private fun formatTime(timestamp: Long): String {
         val now = System.currentTimeMillis()
         val diff = now - timestamp
-
         return when {
             diff < 60000 -> "Just now"
             diff < 3600000 -> "${diff / 60000}m ago"
             diff < 86400000 -> "${diff / 3600000}h ago"
-            else -> {
-                val sdf = SimpleDateFormat("MMM dd", Locale.getDefault())
-                sdf.format(Date(timestamp))
-            }
+            else -> SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(timestamp))
         }
     }
 }

@@ -113,6 +113,11 @@
             android:text="Tap to Record"
             android:layout_marginTop="8dp"
             android:textColor="#666"/>
-
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvNotifications"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:visibility="visible" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

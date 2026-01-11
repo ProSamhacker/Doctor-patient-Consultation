@@ -21,7 +21,7 @@ class MainViewModel(
     private val _currentPatient = MutableLiveData<Patient?>()
     val currentPatient: LiveData<Patient?> = _currentPatient
 
-    // Appointments
+    // --- APPOINTMENTS (Reactive Data Streams) ---
     val upcomingAppointments: LiveData<List<Appointment>> =
         if (userRole == "DOCTOR") {
             repository.getDoctorUpcomingAppointments(userId).asLiveData()
@@ -38,7 +38,11 @@ class MainViewModel(
             repository.getPatientAppointments(userId).asLiveData()
         }
 
-    // Prescriptions
+    // Compatibility for AppointmentsFragment (Aliases to allAppointments)
+    val doctorAppointments: LiveData<List<Appointment>> get() = allAppointments
+    val patientAppointments: LiveData<List<Appointment>> get() = allAppointments
+
+    // --- PRESCRIPTIONS ---
     val prescriptions: LiveData<List<Prescription>> =
         if (userRole == "DOCTOR") {
             repository.getDoctorPrescriptions(userId).asLiveData()
@@ -46,29 +50,28 @@ class MainViewModel(
             repository.getPatientPrescriptions(userId).asLiveData()
         }
 
-    // Notifications
+    // --- NOTIFICATIONS ---
     val notifications: LiveData<List<NotificationEntity>> =
         repository.getUserNotifications(userId).asLiveData()
 
     val unreadNotificationCount: LiveData<Int> =
         repository.getUnreadCount(userId).asLiveData()
 
-    // Current consultation session
+    // --- CONSULTATION SESSION ---
     private val _currentSessionId = MutableLiveData<Int?>()
     val currentSessionId: LiveData<Int?> = _currentSessionId
 
     private val _consultationTranscript = MutableLiveData<String>()
     val consultationTranscript: LiveData<String> = _consultationTranscript
 
-    // Search results
+    // --- SEARCH RESULTS ---
     private val _searchResults = MutableLiveData<List<Any>>()
     val searchResults: LiveData<List<Any>> = _searchResults
 
-    // Loading state
+    // --- LOADING & MESSAGES ---
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
 
-    // Messages
     private val _messages = MutableLiveData<String>()
     val messages: LiveData<String> = _messages
 
@@ -77,9 +80,7 @@ class MainViewModel(
     }
 
     /**
-     * UPDATED: Smart Profile Loading
-     * 1. Check Local Database (Fast, Offline)
-     * 2. If empty, Fetch from Firebase (Sync) & Save to Local
+     * Smart Profile Loading: Local DB -> Firebase Sync
      */
     private fun loadUserData() {
         viewModelScope.launch {
@@ -125,11 +126,7 @@ class MainViewModel(
                         rating = 0f,
                         isActive = true
                     )
-
-                    // 1. Update UI
                     _currentDoctor.value = doctor
-
-                    // 2. Save to Local Room DB for next time
                     viewModelScope.launch { repository.insertDoctor(doctor) }
                 }
             }
@@ -158,11 +155,7 @@ class MainViewModel(
                         allergies = allergies,
                         chronicConditions = conditions
                     )
-
-                    // 1. Update UI
                     _currentPatient.value = patient
-
-                    // 2. Save to Local Room DB for next time
                     viewModelScope.launch { repository.insertPatient(patient) }
                 }
             }
@@ -171,7 +164,16 @@ class MainViewModel(
             }
     }
 
-    // Appointment operations
+    // --- APPOINTMENT OPERATIONS ---
+
+    fun loadDoctorAppointments(id: String) {
+        // No-op: Data is automatically observed via 'allAppointments' LiveData
+    }
+
+    fun loadPatientAppointments(id: String) {
+        // No-op: Data is automatically observed via 'allAppointments' LiveData
+    }
+
     fun createAppointment(
         doctorId: String,
         patientId: String,
@@ -211,7 +213,56 @@ class MainViewModel(
         }
     }
 
-    // Consultation operations
+    /**
+     * Handles Appointment Accept/Reject Actions from Notifications
+     */
+    fun handleAppointmentAction(notification: NotificationEntity, isAccepted: Boolean) {
+        viewModelScope.launch {
+            try {
+                // 1. Mark Notification as Read (hides the buttons in UI)
+                repository.markNotificationRead(notification.notificationId)
+
+                val appointmentId = notification.relatedId ?: return@launch
+                val appointment = repository.getAppointment(appointmentId) ?: return@launch
+
+                if (isAccepted) {
+                    // ACCEPT: Notify Patient
+                    val patientId = appointment.patientId
+                    repository.createNotification(
+                        NotificationEntity(
+                            userId = patientId,
+                            userType = "PATIENT",
+                            title = "Appointment Confirmed",
+                            message = "Your appointment has been accepted by the doctor.",
+                            type = NotificationType.APPOINTMENT_CONFIRMED,
+                            relatedId = appointmentId
+                        )
+                    )
+                    _messages.value = "Appointment Accepted"
+                } else {
+                    // REJECT: Update Status to CANCELLED & Notify Patient
+                    repository.updateAppointment(appointment.copy(status = AppointmentStatus.CANCELLED))
+
+                    val patientId = appointment.patientId
+                    repository.createNotification(
+                        NotificationEntity(
+                            userId = patientId,
+                            userType = "PATIENT",
+                            title = "Appointment Declined",
+                            message = "Your appointment request was declined.",
+                            type = NotificationType.APPOINTMENT_CANCELLED,
+                            relatedId = appointmentId
+                        )
+                    )
+                    _messages.value = "Appointment Rejected"
+                }
+            } catch (e: Exception) {
+                _messages.value = "Action failed: ${e.message}"
+            }
+        }
+    }
+
+    // --- CONSULTATION OPERATIONS ---
     fun startConsultation(appointmentId: Int) {
         viewModelScope.launch {
             try {
@@ -243,7 +294,9 @@ class MainViewModel(
         }
     }
 
-    // Prescription operations
+    // --- PRESCRIPTION OPERATIONS ---
+
+    // Overload 1: Individual fields (Existing)
     fun createPrescription(
         appointmentId: Int,
         diagnosis: String,
@@ -271,7 +324,22 @@ class MainViewModel(
         }
     }
 
-    // Search operations
+    // Overload 2: Object (For AppointmentsFragment)
+    fun createPrescription(prescription: Prescription) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                repository.createPrescription(prescription)
+                _messages.value = "Prescription created successfully"
+            } catch (e: Exception) {
+                _messages.value = "Failed to create prescription: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    // --- SEARCH OPERATIONS ---
     fun searchDoctors(query: String) {
         viewModelScope.launch {
             try {
@@ -300,7 +368,7 @@ class MainViewModel(
         }
     }
 
-    // Notification operations
+    // --- NOTIFICATION OPERATIONS ---
     fun markNotificationAsRead(notificationId: Int) {
         viewModelScope.launch {
             repository.markNotificationRead(notificationId)
@@ -313,7 +381,7 @@ class MainViewModel(
         }
     }
 
-    // AI operations
+    // --- AI OPERATIONS ---
     fun getLaymanExplanation(medicalTerm: String, callback: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -342,7 +410,7 @@ class MainViewModel(
         }
     }
 
-    // Get next patient (for doctors)
+    // --- MISC OPERATIONS ---
     fun getNextPatient() {
         viewModelScope.launch {
             try {
@@ -361,7 +429,6 @@ class MainViewModel(
         }
     }
 
-    // Send message
     fun sendMessage(appointmentId: Int, content: String, messageType: MessageType = MessageType.TEXT) {
         viewModelScope.launch {
             try {
@@ -379,7 +446,6 @@ class MainViewModel(
         }
     }
 
-    // Record vital signs
     fun recordVitalSigns(appointmentId: Int, vitals: VitalSigns) {
         viewModelScope.launch {
             try {
@@ -391,6 +457,7 @@ class MainViewModel(
         }
     }
 
+    // --- FACTORY ---
     class Factory(
         private val repository: HospitalRepository,
         private val userId: String,

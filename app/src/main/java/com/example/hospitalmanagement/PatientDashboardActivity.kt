@@ -57,20 +57,55 @@ class PatientDashboardActivity : AppCompatActivity() {
         )
         val factory = MainViewModel.Factory(repository, userId, userRole)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
-
+        AppointmentScheduler.startMonitoring(
+            context = this,
+            scope = lifecycleScope,
+            repository = viewModel.repository,
+            userId = userId,
+            userRole = "PATIENT"
+        )
         setupUI(savedInstanceState)
         checkPermissions()
     }
-
+    override fun onDestroy() {
+        super.onDestroy()
+        AppointmentScheduler.stopMonitoring()
+    }
     private fun setupUI(savedInstanceState: Bundle?) {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNavigationViewPatient)
         val fabMic = findViewById<FloatingActionButton>(R.id.fabMicPatient)
         val containerId = R.id.fragment_container_patient
-
+        // Inside setupUI or onCreate of Dashboard
+        lifecycleScope.launch {
+            // Poll every minute
+            while (true) {
+                val now = System.currentTimeMillis()
+                // Simple check: Look for accepted appointments +/- 1 minute from now
+                viewModel.allAppointments.value?.find { appt ->
+                    val diff = Math.abs(appt.dateTime - now)
+                    // 60000ms = 1 minute tolerance
+                    diff < 60000 && appt.status == AppointmentStatus.SCHEDULED
+                }?.let { appointment ->
+                    // Found a meeting starting NOW
+                    AppointmentScheduler.triggerMeetingNotification(
+                        this@PatientDashboardActivity, // or PatientDashboardActivity
+                        appointment.appId,
+                        userId,
+                        userRole
+                    )
+                    // Prevent spamming
+                    kotlinx.coroutines.delay(60000)
+                }
+                kotlinx.coroutines.delay(30000) // Check every 30 seconds
+            }
+        }
         // --- SEARCH LOGIC START ---
         val btnSearch = findViewById<ImageButton>(R.id.btnSearchPatient)
         btnSearch.setOnClickListener {
-            // TODO: Implement search functionality
+            val intent = Intent(this, SearchActivity::class.java)
+            intent.putExtra("USER_ID", userId)
+            intent.putExtra("USER_ROLE", userRole)
+            startActivity(intent)
         }
         // --- SEARCH LOGIC END ---
 
