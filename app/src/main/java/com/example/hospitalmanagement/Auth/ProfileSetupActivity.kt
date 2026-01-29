@@ -1,10 +1,9 @@
 package com.example.hospitalmanagement.auth
 
-import android.Manifest
-import android.content.Intent // Required for Intent
-import android.content.pm.PackageManager
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.RadioButton
@@ -14,8 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.example.hospitalmanagement.DoctorDashboardActivity // FIXED: Import Added
-import com.example.hospitalmanagement.PatientDashboardActivity // FIXED: Import Added
+import com.example.hospitalmanagement.DoctorDashboardActivity
+import com.example.hospitalmanagement.PatientDashboardActivity
+import com.example.hospitalmanagement.R
 import com.example.hospitalmanagement.databinding.ActivityProfileSetupBinding
 import com.example.hospitalmanagement.models.DoctorProfile
 import com.example.hospitalmanagement.models.PatientProfile
@@ -23,7 +23,10 @@ import com.example.hospitalmanagement.models.UserType
 import com.example.hospitalmanagement.storage.VercelBlobStorage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import com.yalantis.ucrop.UCrop // Import uCrop
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.Date
 
 class ProfileSetupActivity : AppCompatActivity() {
@@ -35,8 +38,12 @@ class ProfileSetupActivity : AppCompatActivity() {
     private lateinit var userType: UserType
 
     private var selectedImageUri: Uri? = null
+
+    // Launcher 1: Picks raw image from gallery
     private lateinit var imagePickerLauncher: ActivityResultLauncher<String>
-    private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+    // Launcher 2: Handles the result from uCrop activity
+    private lateinit var cropImageLauncher: ActivityResultLauncher<Intent>
+
     private var isEditMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +55,6 @@ class ProfileSetupActivity : AppCompatActivity() {
         firestore = FirebaseFirestore.getInstance()
         storage = VercelBlobStorage(this)
 
-        // Get UserType from Intent
         val userTypeString = intent.getStringExtra("USER_TYPE") ?: "PATIENT"
         userType = try {
             UserType.valueOf(userTypeString)
@@ -56,10 +62,9 @@ class ProfileSetupActivity : AppCompatActivity() {
             UserType.PATIENT
         }
 
-        // Check for Edit Mode
         isEditMode = intent.getBooleanExtra("IS_EDIT_MODE", false)
 
-        setupImagePicker()
+        setupImagePickers() //Renamed
         setupUI()
 
         if (isEditMode) {
@@ -73,13 +78,18 @@ class ProfileSetupActivity : AppCompatActivity() {
         val userId = auth.currentUser?.uid ?: return
         binding.progressBar.visibility = View.VISIBLE
 
-        if (userType == UserType.DOCTOR) {
-            firestore.collection("doctors").document(userId).get()
-                .addOnSuccessListener { document ->
-                    binding.progressBar.visibility = View.GONE
-                    if (document.exists()) {
-                        binding.etName.setText(document.getString("name"))
-                        binding.etPhone.setText(document.getString("phone"))
+        val collection = if (userType == UserType.DOCTOR) "doctors" else "patients"
+
+        firestore.collection(collection).document(userId).get()
+            .addOnSuccessListener { document ->
+                binding.progressBar.visibility = View.GONE
+                if (document.exists()) {
+                    binding.etName.setText(document.getString("name"))
+                    binding.etPhone.setText(document.getString("phone"))
+
+                    // TODO: Load existing Profile Image URL into ivProfileImage using Glide or Coil here
+
+                    if (userType == UserType.DOCTOR) {
                         binding.etSpecialization.setText(document.getString("specialization"))
                         binding.etHospital.setText(document.getString("hospitalName"))
                         binding.etExperience.setText(document.getLong("experience")?.toString())
@@ -89,18 +99,14 @@ class ProfileSetupActivity : AppCompatActivity() {
 
                         val quals = document.get("qualifications") as? List<String>
                         binding.etQualifications.setText(quals?.joinToString(", "))
-                    }
-                }
-        } else {
-            firestore.collection("patients").document(userId).get()
-                .addOnSuccessListener { document ->
-                    binding.progressBar.visibility = View.GONE
-                    if (document.exists()) {
-                        binding.etName.setText(document.getString("name"))
-                        binding.etPhone.setText(document.getString("phone"))
+                    } else {
                         binding.etAge.setText(document.getLong("age")?.toString())
                         binding.etAddress.setText(document.getString("address"))
                         binding.etBloodGroup.setText(document.getString("bloodGroup"))
+
+                        // Load Gender
+                        val genderStr = document.getString("gender")
+                        if (genderStr == "Female") binding.rbFemale.isChecked = true else binding.rbMale.isChecked = true
 
                         val allergies = document.get("allergies") as? List<String>
                         binding.etAllergies.setText(allergies?.joinToString(", "))
@@ -109,29 +115,79 @@ class ProfileSetupActivity : AppCompatActivity() {
                         binding.etConditions.setText(conditions?.joinToString(", "))
                     }
                 }
-        }
+            }
+            .addOnFailureListener {
+                binding.progressBar.visibility = View.GONE
+            }
     }
 
-    private fun setupImagePicker() {
+    private fun setupImagePickers() {
+        // Step 1: Pick raw image
         imagePickerLauncher = registerForActivityResult(
             ActivityResultContracts.GetContent()
         ) { uri: Uri? ->
             uri?.let {
-                selectedImageUri = it
-                binding.ivProfileImage.setImageURI(it)
-                binding.tvSelectImage.text = "Change Photo"
+                // Once picked, immediately start cropping
+                startCrop(it)
             }
         }
 
-        permissionLauncher = registerForActivityResult(
-            ActivityResultContracts.RequestMultiplePermissions()
-        ) { permissions ->
-            val allGranted = permissions.values.all { it }
-            if (allGranted) {
-                openImagePicker()
-            } else {
-                Toast.makeText(this, "Permission denied. Cannot select image.", Toast.LENGTH_SHORT).show()
+        // Step 2: Handle cropped result
+        cropImageLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == RESULT_OK && result.data != null) {
+                val resultUri = UCrop.getOutput(result.data!!)
+                resultUri?.let {
+                    selectedImageUri = it
+                    displaySelectedImage(it)
+                }
+            } else if (result.resultCode == UCrop.RESULT_ERROR) {
+                val cropError = UCrop.getError(result.data!!)
+                Toast.makeText(this, "Crop error: ${cropError?.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    // Function to configure and start uCrop
+    private fun startCrop(sourceUri: Uri) {
+        val destinationFileName = "cropped_profile_${System.currentTimeMillis()}.jpg"
+        val destinationUri = Uri.fromFile(File(cacheDir, destinationFileName))
+
+        val uCrop = UCrop.of(sourceUri, destinationUri)
+
+        // Force 1:1 Square Aspect Ratio
+        uCrop.withAspectRatio(1f, 1f)
+
+        // Set max size for profile image to save bandwidth
+        uCrop.withMaxResultSize(1080, 1080)
+
+        // Style the Cropping Activity to match Dark Theme
+        val options = UCrop.Options()
+        options.setCompressionQuality(90)
+        options.setToolbarColor(Color.parseColor("#121212")) // Match background
+        options.setStatusBarColor(Color.parseColor("#121212"))
+        options.setToolbarWidgetColor(Color.WHITE)
+        options.setActiveControlsWidgetColor(Color.parseColor("#4A90E2")) // Accent color
+
+        uCrop.withOptions(options)
+
+        cropImageLauncher.launch(uCrop.getIntent(this))
+    }
+
+
+    private fun displaySelectedImage(uri: Uri) {
+        try {
+            val inputStream = contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            binding.ivProfileImage.setImageBitmap(bitmap)
+            // Remove padding and tint so the cropped image fills the circle
+            binding.ivProfileImage.setPadding(0, 0, 0, 0)
+            binding.ivProfileImage.imageTintList = null
+            inputStream?.close()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Failed to load image preview", Toast.LENGTH_SHORT).show()
+            e.printStackTrace()
         }
     }
 
@@ -144,10 +200,12 @@ class ProfileSetupActivity : AppCompatActivity() {
             binding.layoutDoctorFields.visibility = View.GONE
             binding.layoutPatientFields.visibility = View.VISIBLE
             binding.tvTitle.text = "Patient Profile"
+            // Default gender selection
+            binding.rbMale.isChecked = true
         }
 
         binding.layoutSelectImage.setOnClickListener {
-            checkAndRequestPermissions()
+            imagePickerLauncher.launch("image/*")
         }
 
         binding.btnSave.setOnClickListener {
@@ -157,37 +215,27 @@ class ProfileSetupActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkAndRequestPermissions() {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
-        } else {
-            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
-
-        val allGranted = permissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-        }
-
-        if (allGranted) {
-            openImagePicker()
-        } else {
-            permissionLauncher.launch(permissions)
-        }
-    }
-
-    private fun openImagePicker() {
-        imagePickerLauncher.launch("image/*")
-    }
-
+    // --- CHANGED: Phone Number Validation ---
     private fun validateInputs(): Boolean {
+        binding.tilName.error = null
+        binding.tilPhone.error = null
+
         if (binding.etName.text.toString().isBlank()) {
             binding.tilName.error = "Name is required"
             return false
         }
-        if (binding.etPhone.text.toString().isBlank()) {
+
+        val phoneInput = binding.etPhone.text.toString().trim()
+        if (phoneInput.isBlank()) {
             binding.tilPhone.error = "Phone is required"
             return false
         }
+
+        if (phoneInput.length != 10) {
+            binding.tilPhone.error = "Phone number must be exactly 10 digits"
+            return false
+        }
+
         return true
     }
 
@@ -201,20 +249,14 @@ class ProfileSetupActivity : AppCompatActivity() {
             try {
                 var profileImageUrl = ""
 
-                // Upload Image only if a new one is selected
                 if (selectedImageUri != null) {
                     val uploadResult = storage.uploadProfileImage(selectedImageUri!!, userId)
-                    uploadResult.onSuccess { url ->
-                        profileImageUrl = url
-                    }.onFailure { e ->
-                        throw Exception("Image upload failed: ${e.message}")
+                    if (uploadResult.isSuccess) {
+                        profileImageUrl = uploadResult.getOrNull() ?: ""
+                    } else {
+                        val error = uploadResult.exceptionOrNull()
+                        Toast.makeText(this@ProfileSetupActivity, "Image upload warning: ${error?.message}", Toast.LENGTH_LONG).show()
                     }
-                } else {
-                    // In edit mode, if no new image, we might want to keep the old URL.
-                    // For simplicity, we send empty string here, but in production,
-                    // you'd fetch the existing URL first if not overwriting.
-                    // Or ideally, rely on `merge` if using update, but here we use `set`.
-                    // A quick fix is to fetch current URL or ignore image update if empty.
                 }
 
                 if (userType == UserType.DOCTOR) {
@@ -239,26 +281,32 @@ class ProfileSetupActivity : AppCompatActivity() {
             .map { it.trim() }
             .filter { it.isNotEmpty() }
 
-        val profile = DoctorProfile(
-            uid = userId,
-            name = binding.etName.text.toString().trim(),
-            email = email,
-            phone = binding.etPhone.text.toString().trim(),
-            specialization = binding.etSpecialization.text.toString().trim(),
-            hospitalName = binding.etHospital.text.toString().trim(),
-            experience = binding.etExperience.text.toString().toIntOrNull() ?: 0,
-            qualifications = qualificationsList,
-            licenseNumber = binding.etLicense.text.toString().trim(),
-            consultationFee = binding.etFee.text.toString().toDoubleOrNull() ?: 0.0,
-            bio = binding.etBio.text.toString().trim(),
-            profileImageUrl = imageUrl,
-            isActive = true,
-            createdAt = Date(),
-            updatedAt = Date()
+        val updates = hashMapOf<String, Any>(
+            "uid" to userId,
+            "name" to binding.etName.text.toString().trim(),
+            "email" to email,
+            "phone" to binding.etPhone.text.toString().trim(),
+            "specialization" to binding.etSpecialization.text.toString().trim(),
+            "hospitalName" to binding.etHospital.text.toString().trim(),
+            "experience" to (binding.etExperience.text.toString().toIntOrNull() ?: 0),
+            "qualifications" to qualificationsList,
+            "licenseNumber" to binding.etLicense.text.toString().trim(),
+            "consultationFee" to (binding.etFee.text.toString().toDoubleOrNull() ?: 0.0),
+            "bio" to binding.etBio.text.toString().trim(),
+            "isActive" to true,
+            "updatedAt" to Date()
         )
 
+        if (imageUrl.isNotEmpty()) {
+            updates["profileImageUrl"] = imageUrl
+        }
+
+        if (!isEditMode) {
+            updates["createdAt"] = Date()
+        }
+
         firestore.collection("doctors").document(userId)
-            .set(profile)
+            .set(updates, SetOptions.merge())
             .addOnSuccessListener { updateUserProfileStatus(userId) }
             .addOnFailureListener { e -> handleError(e) }
     }
@@ -266,11 +314,13 @@ class ProfileSetupActivity : AppCompatActivity() {
     private fun savePatientProfile(userId: String, imageUrl: String) {
         val email = auth.currentUser?.email ?: ""
 
+        // --- CHANGED: Updated Gender Selection Logic (Safely handle missing Other) ---
         val selectedGenderId = binding.rgGender.checkedRadioButtonId
         val gender = if (selectedGenderId != -1) {
-            findViewById<RadioButton>(selectedGenderId)?.text?.toString() ?: "Other"
+            findViewById<RadioButton>(selectedGenderId)?.text?.toString() ?: "Male"
         } else {
-            "Other"
+            // Default fallback if somehow nothing is checked (though we set Male default in setupUI)
+            "Male"
         }
 
         val allergiesList = binding.etAllergies.text.toString()
@@ -283,24 +333,30 @@ class ProfileSetupActivity : AppCompatActivity() {
             .map { it.trim() }
             .filter { it.isNotEmpty() }
 
-        val profile = PatientProfile(
-            uid = userId,
-            name = binding.etName.text.toString().trim(),
-            email = email,
-            phone = binding.etPhone.text.toString().trim(),
-            age = binding.etAge.text.toString().toIntOrNull() ?: 0,
-            gender = gender,
-            bloodGroup = binding.etBloodGroup.text.toString().trim(),
-            address = binding.etAddress.text.toString().trim(),
-            allergies = allergiesList,
-            chronicConditions = conditionsList,
-            profileImageUrl = imageUrl,
-            createdAt = Date(),
-            updatedAt = Date()
+        val updates = hashMapOf<String, Any>(
+            "uid" to userId,
+            "name" to binding.etName.text.toString().trim(),
+            "email" to email,
+            "phone" to binding.etPhone.text.toString().trim(),
+            "age" to (binding.etAge.text.toString().toIntOrNull() ?: 0),
+            "gender" to gender,
+            "bloodGroup" to binding.etBloodGroup.text.toString().trim(),
+            "address" to binding.etAddress.text.toString().trim(),
+            "allergies" to allergiesList,
+            "chronicConditions" to conditionsList,
+            "updatedAt" to Date()
         )
 
+        if (imageUrl.isNotEmpty()) {
+            updates["profileImageUrl"] = imageUrl
+        }
+
+        if (!isEditMode) {
+            updates["createdAt"] = Date()
+        }
+
         firestore.collection("patients").document(userId)
-            .set(profile)
+            .set(updates, SetOptions.merge())
             .addOnSuccessListener { updateUserProfileStatus(userId) }
             .addOnFailureListener { e -> handleError(e) }
     }
@@ -312,7 +368,6 @@ class ProfileSetupActivity : AppCompatActivity() {
                 binding.progressBar.visibility = View.GONE
                 Toast.makeText(this, "Profile Saved Successfully!", Toast.LENGTH_SHORT).show()
 
-                // FIXED: Explicitly typed variable to avoid "Argument Type Mismatch"
                 val targetActivity: Class<*> = if (userType == UserType.DOCTOR) {
                     DoctorDashboardActivity::class.java
                 } else {

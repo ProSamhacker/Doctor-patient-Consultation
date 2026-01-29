@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
@@ -16,9 +17,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.hospitalmanagement.ADAPTER.AppointmentAdapter
 import com.example.hospitalmanagement.Appointment
+import com.example.hospitalmanagement.ConsultationActivity
 import com.example.hospitalmanagement.MainViewModel
 import com.example.hospitalmanagement.MedicationSchedule
 import com.example.hospitalmanagement.Prescription
+import com.example.hospitalmanagement.ProfileOverlayDialog
 import com.example.hospitalmanagement.R
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -26,11 +29,11 @@ import java.util.Date
 import java.util.Locale
 
 class AppointmentsFragment : Fragment() {
+
     private lateinit var viewModel: MainViewModel
-    private lateinit var rvAppointments: RecyclerView
     private lateinit var adapter: AppointmentAdapter
-    private var userRole: String = "PATIENT"
     private var userId: String = ""
+    private var userRole: String = "PATIENT"
 
     companion object {
         fun newInstance(userId: String, userRole: String): AppointmentsFragment {
@@ -57,36 +60,49 @@ class AppointmentsFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View? {
         val view = inflater.inflate(R.layout.fragment_appointments, container, false)
-
-        rvAppointments = view.findViewById(R.id.rvAppointments)
-        rvAppointments.layoutManager = LinearLayoutManager(requireContext())
-
-        adapter = AppointmentAdapter(
-            appointments = emptyList(),
-            userRole = userRole,
-            onCallClick = { appointment -> handleCallClick(appointment) },
-            onPrescribeClick = { appointment -> handlePrescribeClick(appointment) },
-            onViewClick = { appointment -> handleViewClick(appointment) }
-        )
-        rvAppointments.adapter = adapter
-
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
-        observeData()
+        setupRecyclerView(view)
 
         return view
     }
 
-    private fun observeData() {
-        // Load appropriate appointments based on role
-        if (userRole == "DOCTOR") {
-            viewModel.loadDoctorAppointments(userId)
-            viewModel.doctorAppointments.observe(viewLifecycleOwner) { appointments ->
-                adapter.updateData(appointments)
+    private fun setupRecyclerView(view: View) {
+        val recyclerView = view.findViewById<RecyclerView>(R.id.rvAppointments)
+        val tvEmpty = view.findViewById<TextView>(R.id.tvEmptyState)
+
+        recyclerView.layoutManager = LinearLayoutManager(context)
+
+        // Initialize Adapter with callbacks wired to the handle functions
+        adapter = AppointmentAdapter(
+            appointments = emptyList(),
+            userRole = userRole,
+            onCallClick = { appointment ->
+                handleCallClick(appointment)
+            },
+            onPrescribeClick = { appointment ->
+                handlePrescribeClick(appointment)
+            },
+            onViewClick = { appointment ->
+                handleViewClick(appointment)
+            },
+            onProfileClick = { targetId, targetRole ->
+                // Show Profile Overlay
+                val dialog = ProfileOverlayDialog(targetId, targetRole, viewModel.repository)
+                dialog.show(parentFragmentManager, "ProfileOverlay")
             }
-        } else {
-            viewModel.loadPatientAppointments(userId)
-            viewModel.patientAppointments.observe(viewLifecycleOwner) { appointments ->
+        )
+
+        recyclerView.adapter = adapter
+
+        // Observe Data
+        viewModel.allAppointments.observe(viewLifecycleOwner) { appointments ->
+            if (appointments.isEmpty()) {
+                tvEmpty.visibility = View.VISIBLE
+                recyclerView.visibility = View.GONE
+            } else {
+                tvEmpty.visibility = View.GONE
+                recyclerView.visibility = View.VISIBLE
                 adapter.updateData(appointments)
             }
         }
@@ -114,14 +130,14 @@ class AppointmentsFragment : Fragment() {
 
     // --- 2. PRESCRIBE FUNCTIONALITY ---
     private fun handlePrescribeClick(appointment: Appointment) {
+        // Inflate the custom dialog layout
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_medication, null)
 
-        // Find views in the dialog layout
         val etDiagnosis = dialogView.findViewById<EditText>(R.id.etDiagnosis)
         val etMedication = dialogView.findViewById<EditText>(R.id.etMedicationName)
-        // Ensure you have fields for dosage/instructions in your XML, or simplify for this example
+        val etInstructions = dialogView.findViewById<EditText>(R.id.etMedicationSection) // Reusing this field for instructions
 
-        // Pre-fill diagnosis if available from appointment notes
+        // Pre-fill diagnosis if available
         etDiagnosis.setText(appointment.chiefComplaint)
 
         AlertDialog.Builder(requireContext())
@@ -130,9 +146,10 @@ class AppointmentsFragment : Fragment() {
             .setPositiveButton("Submit") { _, _ ->
                 val diagnosis = etDiagnosis.text.toString()
                 val medicationName = etMedication.text.toString()
+                val instructions = etInstructions.text.toString()
 
                 if (diagnosis.isNotBlank() && medicationName.isNotBlank()) {
-                    savePrescription(appointment, diagnosis, medicationName)
+                    savePrescription(appointment, diagnosis, medicationName, instructions)
                 } else {
                     Toast.makeText(context, "Please fill required details", Toast.LENGTH_SHORT).show()
                 }
@@ -141,13 +158,13 @@ class AppointmentsFragment : Fragment() {
             .show()
     }
 
-    private fun savePrescription(appointment: Appointment, diagnosis: String, medName: String) {
+    private fun savePrescription(appointment: Appointment, diagnosis: String, medName: String, instructions: String) {
         lifecycleScope.launch {
             try {
                 // Create a basic medication schedule object
                 val medication = MedicationSchedule(
                     medicationName = medName,
-                    dosage = "1 tablet", // Default or add input field for this
+                    dosage = "1 tablet",
                     frequency = "Twice Daily",
                     duration = "5 Days",
                     timing = "After Food"
@@ -157,9 +174,10 @@ class AppointmentsFragment : Fragment() {
                     appId = appointment.appId,
                     diagnosis = diagnosis,
                     medications = listOf(medication),
-                    instructions = "Take rest and drink plenty of water."
+                    instructions = instructions.ifBlank { "Take exactly as prescribed." }
                 )
 
+                // Call ViewModel to save to DB
                 viewModel.createPrescription(prescription)
                 Toast.makeText(context, "Prescription sent successfully!", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
@@ -170,6 +188,16 @@ class AppointmentsFragment : Fragment() {
 
     // --- 3. VIEW DETAILS FUNCTIONALITY ---
     private fun handleViewClick(appointment: Appointment) {
+        // If it's a consultation, open the Activity
+        if (appointment.status != com.example.hospitalmanagement.AppointmentStatus.SCHEDULED) {
+            val intent = Intent(requireContext(), ConsultationActivity::class.java)
+            intent.putExtra("APP_ID", appointment.appId)
+            intent.putExtra("USER_ROLE", userRole)
+            startActivity(intent)
+            return
+        }
+
+        // Otherwise show simple dialog
         val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
         val dateStr = sdf.format(Date(appointment.dateTime))
 

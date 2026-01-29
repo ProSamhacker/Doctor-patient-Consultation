@@ -1,4 +1,5 @@
 package com.example.hospitalmanagement.ADAPTER
+
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,13 +12,18 @@ import com.example.hospitalmanagement.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
 class AppointmentAdapter(
     private var appointments: List<Appointment>,
     private val userRole: String,
     private val onCallClick: (Appointment) -> Unit,
     private val onPrescribeClick: (Appointment) -> Unit,
-    private val onViewClick: (Appointment) -> Unit
+    private val onViewClick: (Appointment) -> Unit,
+    private val onProfileClick: (String, String) -> Unit // New callback: (userId, userType)
 ) : RecyclerView.Adapter<AppointmentAdapter.ViewHolder>() {
+
+    // Store names locally: Map<ID, Name>
+    private var namesMap: Map<String, String> = emptyMap()
 
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvPatientName: TextView = view.findViewById(R.id.tvPatientName)
@@ -38,11 +44,22 @@ class AppointmentAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val appointment = appointments[position]
 
-        // This would normally load patient/doctor name from database
-        holder.tvPatientName.text = if (userRole == "DOCTOR") {
+        // Determine target ID and Type
+        val targetId = if (userRole == "DOCTOR") appointment.patientId else appointment.doctorId
+        val targetRole = if (userRole == "DOCTOR") "PATIENT" else "DOCTOR"
+
+        // Use cached name or fallback to ID
+        val displayName = namesMap[targetId] ?: if (userRole == "DOCTOR") {
             "Patient ID: ${appointment.patientId}"
         } else {
             "Doctor ID: ${appointment.doctorId}"
+        }
+
+        holder.tvPatientName.text = displayName
+
+        // PROFILE CLICK
+        holder.tvPatientName.setOnClickListener {
+            onProfileClick(targetId, targetRole)
         }
 
         holder.tvDateTime.text = formatDateTime(appointment.dateTime)
@@ -56,9 +73,9 @@ class AppointmentAdapter(
             AppointmentStatus.COMPLETED -> 0xFF9E9E9E.toInt()
             AppointmentStatus.CANCELLED -> 0xFFF44336.toInt()
             AppointmentStatus.NO_SHOW -> 0xFFFF9800.toInt()
+            else -> 0xFF000000.toInt()
         })
 
-        // Show/hide buttons based on role
         if (userRole == "DOCTOR") {
             holder.btnCall.visibility = View.VISIBLE
             holder.btnPrescribe.visibility = View.VISIBLE
@@ -79,8 +96,14 @@ class AppointmentAdapter(
         notifyDataSetChanged()
     }
 
+    // New method to update names map
+    fun updateNames(newNames: Map<String, String>) {
+        namesMap = newNames
+        notifyDataSetChanged()
+    }
+
     private fun formatDateTime(timestamp: Long): String {
-        val sdf = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
+        val sdf = SimpleDateFormat("MMM dd, yyyy • h:mm a", Locale.getDefault())
         return sdf.format(Date(timestamp))
     }
 }

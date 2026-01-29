@@ -13,7 +13,7 @@ android {
         buildConfig = true
         viewBinding = true // Enable View Binding
     }
-    
+
     defaultConfig {
         applicationId = "com.example.hospitalmanagement"
         minSdk = 21
@@ -21,16 +21,16 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
+
         buildConfigField(
-            "String",
-            "GEMINI_API_KEY",
-            "\"${project.findProperty("GEMINI_API_KEY") ?: "AIzaSyAP4E9kxbEJXCrzLwkQTdDNpFzwQ3Js9Ns"}\""
+                "String",
+                "GEMINI_API_KEY",
+                "\"${project.findProperty("GEMINI_API_KEY") ?: "AIzaSyAAGkmzOcpmO3o0golJ-zaCd4b6z92z88Q"}\""
         )
         buildConfigField(
-        "String",
-        "VERCEL_BLOB_TOKEN",
-        "\"${project.findProperty("VERCEL_BLOB_TOKEN") ?: "YOUR_VERCEL_TOKEN_HERE"}\""
+                "String",
+                "VERCEL_BLOB_TOKEN",
+                "\"${project.findProperty("VERCEL_BLOB_TOKEN") ?: "YOUR_VERCEL_TOKEN_HERE"}\""
         )
     }
 
@@ -38,20 +38,18 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                    getDefaultProguardFile("proguard-android-optimize.txt"),
+                    "proguard-rules.pro"
             )
         }
     }
-    
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    
-    kotlinOptions {
-        jvmTarget = "11"
-    }
+
+    kotlinOptions { jvmTarget = "11" }
 }
 
 dependencies {
@@ -64,6 +62,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation("com.github.yalantis:ucrop:2.2.9") // Add uCrop for image cropping
 
     // RecyclerView
     implementation("androidx.recyclerview:recyclerview:1.3.2")
@@ -87,7 +86,7 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-messaging-ktx")
-    
+
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:20.7.0")
 
@@ -99,14 +98,14 @@ dependencies {
 
     // JSON
     implementation("com.google.code.gson:gson:2.9.0")
-    
+
     // Vercel Blob Storage
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
     // Image Loading
     implementation("io.coil-kt:coil:2.5.0")
-    
+
     // Fragment KTX
     implementation("androidx.fragment:fragment-ktx:1.6.2")
 }

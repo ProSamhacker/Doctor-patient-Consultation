@@ -4,120 +4,259 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5">
+    android:background="#FFFFFF">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center_horizontal"
-        android:paddingBottom="40dp">
+        android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/colorPrimary"
-            android:orientation="vertical"
-            android:padding="24dp"
-            android:paddingBottom="40dp">
+            android:background="#4285F4"
+            android:orientation="horizontal"
+            android:padding="16dp"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/ivDoctorAvatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_doctor_avatar"
+                android:background="@drawable/bg_circle_white"
+                android:padding="2dp"/>
 
             <TextView
                 android:id="@+id/tvDoctorName"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="Dr. Samir"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="Dr. Jane Smith"
                 android:textColor="#FFFFFF"
-                android:textSize="24sp"
-                android:textStyle="bold" />
+                android:textSize="18sp"
+                android:textStyle="bold"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardTodaySchedule"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Next Appointment"
+                            android:textColor="#666666"
+                            android:textSize="14sp"/>
+
+                        <TextView
+                            android:id="@+id/tvScheduleCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Checking..."
+                            android:textColor="#4285F4"
+                            android:textStyle="bold"
+                            android:textSize="12sp"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="12dp">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_calendar"
+                            app:tint="#4285F4"
+                            android:padding="8dp"/>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="12dp">
+
+                            <TextView
+                                android:id="@+id/tvScheduleDate"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="No upcoming appointments"
+                                android:textColor="#000000"
+                                android:textSize="16sp"
+                                android:textStyle="bold"/>
+
+                            <TextView
+                                android:id="@+id/tvScheduleTime"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text=""
+                                android:textColor="#666666"
+                                android:textSize="14sp"
+                                android:layout_marginTop="2dp"/>
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="#999999"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Cardiologist • Apollo Hospital"
-                android:textColor="#E0E0E0"
-                android:textSize="14sp" />
-        </LinearLayout>
+                android:text="Features"
+                android:textColor="#666666"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp"/>
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginTop="-20dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="6dp">
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-                <TextView
-                    android:layout_width="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="3"
+                android:layout_marginBottom="16dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardViewSchedule"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Today's Schedule"
-                    android:textStyle="bold"
-                    android:textColor="#333"/>
-                <TextView
-                    android:id="@+id/tvScheduleCount"
-                    android:layout_width="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="2dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="16dp">
+
+                        <ImageView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:src="@drawable/ic_calendar"
+                            android:background="@drawable/bg_circle_blue"
+                            android:padding="12dp"
+                            app:tint="#FFFFFF"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="View\nSchedule"
+                            android:textColor="#333333"
+                            android:textSize="12sp"
+                            android:textAlignment="center"
+                            android:layout_marginTop="8dp"/>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardPatientRequests"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="5 Appointments Remaining"
-                    android:textSize="18sp"
-                    android:layout_marginTop="8dp"
-                    android:textColor="@color/colorPrimary"/>
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="4dp"
+                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="2dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="16dp">
+
+                        <ImageView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:src="@drawable/ic_patients"
+                            android:background="@drawable/bg_circle_blue"
+                            android:padding="12dp"
+                            app:tint="#FFFFFF"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Patient\nRequests"
+                            android:textColor="#333333"
+                            android:textSize="12sp"
+                            android:textAlignment="center"
+                            android:layout_marginTop="8dp"/>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardWritePrescription"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="2dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="16dp">
+
+                        <ImageView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:src="@drawable/ic_prescription"
+                            android:background="@drawable/bg_circle_blue"
+                            android:padding="12dp"
+                            app:tint="#FFFFFF"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Write\nPrescription"
+                            android:textColor="#333333"
+                            android:textSize="12sp"
+                            android:textAlignment="center"
+                            android:layout_marginTop="8dp"/>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Live Scribe (Active Listening)"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="24dp"
-            android:textStyle="bold"
-            android:textColor="#666"/>
-
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="16dp"
-            app:cardBackgroundColor="#E3F2FD"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="0dp">
-            <TextView
-                android:id="@+id/tvLiveTranscript"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:padding="16dp"
-                android:text="Tap the mic below to start..."
-                android:textColor="#455A64"
-                android:textSize="14sp"
-                android:minLines="3"
-                android:lineSpacingExtra="4dp"/>
-        </androidx.cardview.widget.CardView>
-
-        <ImageButton
-            android:id="@+id/btnMic"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/circle_background"
-            android:backgroundTint="@color/colorPrimary"
-            android:src="@drawable/ic_mic"
-            app:tint="#FFFFFF"
-            android:elevation="6dp" />
-
-        <TextView
-            android:id="@+id/tvStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Tap to Record"
-            android:layout_marginTop="8dp"
-            android:textColor="#666"/>
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvNotifications"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:visibility="visible" />
+        </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

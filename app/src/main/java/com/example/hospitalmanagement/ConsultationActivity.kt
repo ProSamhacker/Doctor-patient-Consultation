@@ -4,7 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.CountDownTimer
+import android.view.View
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -12,7 +14,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class ConsultationActivity : AppCompatActivity() {
@@ -23,17 +28,33 @@ class ConsultationActivity : AppCompatActivity() {
     private var userRole: String = ""
     private var voiceService: VoiceRecognitionService? = null
 
+    // Ensure you have GeminiConversationAssistant.kt created, or comment this out
+    private var aiAssistant: GeminiConversationAssistant? = null
+
     // UI Elements
     private lateinit var tvTimer: TextView
     private lateinit var tvDoctorStatus: TextView
     private lateinit var tvPatientStatus: TextView
     private lateinit var tvTranscript: TextView
+    private lateinit var tvPartialTranscript: TextView
     private lateinit var btnMic: ImageButton
+
+    // AI Insights UI
+    private lateinit var layoutAiInsights: View
+    private lateinit var tvSeverity: TextView
+    private lateinit var tvSymptoms: TextView
+    private lateinit var tvRedFlags: TextView
+    private lateinit var tvQuestions: TextView
+    private lateinit var tvDiagnosis: TextView
+    private lateinit var layoutRedFlags: LinearLayout
+    private lateinit var btnRefreshInsights: MaterialButton
 
     private val firestore = FirebaseFirestore.getInstance()
     private var waitTimer: CountDownTimer? = null
     private var isMicOn = true
     private var otherPartyJoined = false
+    private var fullTranscript = StringBuilder()
+    private var lastAiAnalysisLength = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +77,14 @@ class ConsultationActivity : AppCompatActivity() {
         val factory = MainViewModel.Factory(repository, userId, userRole)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 
+        // Initialize AI Assistant
+        try {
+            aiAssistant = GeminiConversationAssistant(BuildConfig.GEMINI_API_KEY)
+        } catch (e: Exception) {
+            // Handle if class is missing or key issue
+            aiAssistant = null
+        }
+
         setupUI()
         joinMeeting()
         startWaitTimer()
@@ -67,6 +96,17 @@ class ConsultationActivity : AppCompatActivity() {
         tvDoctorStatus = findViewById(R.id.tvDoctorStatus)
         tvPatientStatus = findViewById(R.id.tvPatientStatus)
         tvTranscript = findViewById(R.id.tvFullTranscript)
+        tvPartialTranscript = findViewById(R.id.tvPartialTranscript)
+
+        // AI Insights
+        layoutAiInsights = findViewById(R.id.layoutAiInsights)
+        tvSeverity = findViewById(R.id.tvSeverity)
+        tvSymptoms = findViewById(R.id.tvSymptoms)
+        tvRedFlags = findViewById(R.id.tvRedFlags)
+        tvQuestions = findViewById(R.id.tvQuestions)
+        tvDiagnosis = findViewById(R.id.tvDiagnosis)
+        layoutRedFlags = findViewById(R.id.layoutRedFlags)
+        btnRefreshInsights = findViewById(R.id.btnRefreshInsights)
         btnMic = findViewById(R.id.btnMicToggle)
 
         findViewById<ImageButton>(R.id.btnEndCall).setOnClickListener {
@@ -76,25 +116,28 @@ class ConsultationActivity : AppCompatActivity() {
         btnMic.setOnClickListener {
             isMicOn = !isMicOn
             if (isMicOn) {
-                voiceService?.startListening()
-                btnMic.background.setTint(getColor(R.color.green)) // Assume green resource or hardcode
+                // FIXED: Now VoiceRecognitionService accepts continuous param
+                voiceService?.startListening(continuous = true)
                 btnMic.setImageResource(R.drawable.ic_mic)
+                btnMic.setColorFilter(0xFF4CAF50.toInt())
             } else {
                 voiceService?.stopListening()
-                btnMic.background.setTint(getColor(android.R.color.darker_gray))
-                btnMic.setImageResource(R.drawable.ic_mic) // Or ic_mic_off
+                btnMic.setImageResource(R.drawable.ic_mic_off)
+                btnMic.setColorFilter(0xFF9E9E9E.toInt())
             }
+        }
+
+        btnRefreshInsights.setOnClickListener {
+            refreshAiInsights()
         }
     }
 
     private fun joinMeeting() {
-        // 1. Update My Status in Firestore
         val statusField = if (userRole == "DOCTOR") "doctorJoined" else "patientJoined"
         val meetingRef = firestore.collection("appointments").document(appointmentId.toString())
 
         meetingRef.update(statusField, true)
             .addOnFailureListener {
-                // Create doc if doesn't exist (first person joining)
                 val data = hashMapOf(
                     statusField to true,
                     "transcript" to ""
@@ -102,7 +145,6 @@ class ConsultationActivity : AppCompatActivity() {
                 meetingRef.set(data)
             }
 
-        // 2. Listen for Other Party & Transcript
         meetingRef.addSnapshotListener { snapshot, e ->
             if (e != null || snapshot == null) return@addSnapshotListener
 
@@ -114,7 +156,6 @@ class ConsultationActivity : AppCompatActivity() {
                 updateStatusUI(isDoctorHere, isPatientHere)
                 tvTranscript.text = remoteTranscript
 
-                // Auto-scroll
                 findViewById<ScrollView>(R.id.scrollTranscript).fullScroll(ScrollView.FOCUS_DOWN)
 
                 if (isDoctorHere && isPatientHere && !otherPartyJoined) {
@@ -135,7 +176,6 @@ class ConsultationActivity : AppCompatActivity() {
     }
 
     private fun startWaitTimer() {
-        // 5 Minutes Countdown (300,000 ms)
         waitTimer = object : CountDownTimer(300000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 val min = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished)
@@ -146,7 +186,6 @@ class ConsultationActivity : AppCompatActivity() {
             override fun onFinish() {
                 if (!otherPartyJoined) {
                     Toast.makeText(this@ConsultationActivity, "Meeting Cancelled - User absent", Toast.LENGTH_LONG).show()
-                    // Update DB status to CANCELLED via ViewModel
                     viewModel.updateAppointmentStatus(appointmentId, AppointmentStatus.CANCELLED)
                     finish()
                 }
@@ -166,35 +205,105 @@ class ConsultationActivity : AppCompatActivity() {
             return
         }
 
-        voiceService = VoiceRecognitionService(this, { text ->
-            // Local speech detected -> Append to UI & Sync to Firestore
-            uploadTranscriptChunk(text)
-        }, { error ->
-            // Handle error
-        })
-        voiceService?.startListening()
+        // FIXED: Explicit type for partial result to satisfy compiler
+        voiceService = VoiceRecognitionService(
+            context = this,
+            onResult = { text ->
+                runOnUiThread {
+                    uploadTranscriptChunk(text)
+                    tvPartialTranscript.text = ""
+
+                    if (fullTranscript.length - lastAiAnalysisLength > 100) {
+                        refreshAiInsights()
+                    }
+                }
+            },
+            onError = { error ->
+                runOnUiThread {
+                    if (!error.contains("detect") && !error.contains("Network")) {
+                        // Suppress minor errors in loop
+                        Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onPartialResult = { partial ->
+                runOnUiThread {
+                    tvPartialTranscript.text = "$partial..."
+                }
+            }
+        )
+
+        voiceService?.startListening(continuous = true)
     }
 
     private fun uploadTranscriptChunk(text: String) {
-        // In a real app, you append. Here we just simple-append to the field for demo
-        val meetingRef = firestore.collection("appointments").document(appointmentId.toString())
+        val prefix = if (userRole == "DOCTOR") "Dr: " else "Pt: "
+        val formattedText = "$prefix$text"
+        fullTranscript.append("\n").append(formattedText)
 
-        // Use a transaction or array-union in production. Here simplified:
+        lifecycleScope.launch {
+            viewModel.addToTranscript(formattedText)
+        }
+
+        val meetingRef = firestore.collection("appointments").document(appointmentId.toString())
         firestore.runTransaction { transaction ->
             val snapshot = transaction.get(meetingRef)
             val current = snapshot.getString("transcript") ?: ""
-            val prefix = if (userRole == "DOCTOR") "Dr: " else "Pt: "
-            val newText = "$current\n$prefix$text"
+            val newText = "$current\n$formattedText"
             transaction.update(meetingRef, "transcript", newText)
         }
     }
 
+    private fun refreshAiInsights() {
+        val transcript = fullTranscript.toString()
+        if (transcript.length < 50) return
+
+        btnRefreshInsights.isEnabled = false
+        lifecycleScope.launch {
+            // Using aiAssistant if available, or fall back to Repository if you moved logic there
+            val insights = aiAssistant?.getLiveInsights(transcript)
+
+            runOnUiThread {
+                btnRefreshInsights.isEnabled = true
+                if (insights != null) {
+                    updateAiInsightsUI(insights)
+                    lastAiAnalysisLength = transcript.length
+                }
+            }
+        }
+    }
+
+    private fun updateAiInsightsUI(insights: GeminiConversationAssistant.LiveInsights) {
+        layoutAiInsights.visibility = View.VISIBLE
+
+        tvSeverity.text = insights.severity
+        val severityColor = when (insights.severity) {
+            "LOW" -> 0xFF4CAF50.toInt()
+            "NORMAL" -> 0xFF2196F3.toInt()
+            "HIGH" -> 0xFFFFA000.toInt()
+            "CRITICAL" -> 0xFFF44336.toInt()
+            else -> 0xFF9E9E9E.toInt()
+        }
+        tvSeverity.background.setTint(severityColor)
+
+        tvSymptoms.text = if (insights.detectedSymptoms.isEmpty()) "No symptoms detected yet" else insights.detectedSymptoms.joinToString("\n") { "• $it" }
+
+        if (insights.redFlags.isNotEmpty()) {
+            layoutRedFlags.visibility = View.VISIBLE
+            tvRedFlags.text = insights.redFlags.joinToString("\n") { "• $it" }
+        } else {
+            layoutRedFlags.visibility = View.GONE
+        }
+
+        tvQuestions.text = if (insights.suggestedQuestions.isEmpty()) "Ask about symptom duration" else insights.suggestedQuestions.take(3).joinToString("\n") { "• $it" }
+        tvDiagnosis.text = insights.preliminaryDiagnosis.ifBlank { "Assessing..." }
+    }
+
+
     private fun endMeeting() {
-        // Update my status to false
         val statusField = if (userRole == "DOCTOR") "doctorJoined" else "patientJoined"
         firestore.collection("appointments").document(appointmentId.toString())
             .update(statusField, false)
-
         finish()
     }
 
@@ -202,7 +311,6 @@ class ConsultationActivity : AppCompatActivity() {
         super.onDestroy()
         voiceService?.shutdown()
         waitTimer?.cancel()
-        // Ensure we mark as left if we crash/close
         endMeeting()
     }
 }

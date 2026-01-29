@@ -17,7 +17,6 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -30,6 +29,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Hospitalmanagement"
         tools:replace="android:allowBackup">
+
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
 
         <activity
             android:name=".auth.AuthActivity"
@@ -63,6 +67,11 @@
         <activity
             android:name=".AppointmentRequestActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ConsultationActivity"

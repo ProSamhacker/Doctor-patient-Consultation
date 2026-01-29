@@ -113,6 +113,19 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
+    <!-- AI Insights Panel -->
+    <include
+        android:id="@+id/layoutAiInsights"
+        layout="@layout/layout_ai_insights"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/cardDoctor"
+        tools:visibility="visible" />
+
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -122,7 +135,7 @@
         android:textColor="#666666"
         android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/cardDoctor" />
+        app:layout_constraintTop_toBottomOf="@id/layoutAiInsights" />
 
     <ScrollView
         android:id="@+id/scrollTranscript"
@@ -132,16 +145,33 @@
         android:background="@drawable/status_background"
         android:padding="12dp"
         app:layout_constraintBottom_toTopOf="@id/layoutControls"
-        app:layout_constraintTop_toBottomOf="@id/cardDoctor"
+        app:layout_constraintTop_toBottomOf="@id/layoutAiInsights"
         app:layout_constraintVertical_bias="0.0">
 
-        <TextView
-            android:id="@+id/tvFullTranscript"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:lineSpacingExtra="4dp"
-            android:text="Waiting for conversation to start..."
-            android:textSize="16sp" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvFullTranscript"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineSpacingExtra="4dp"
+                android:text="Waiting for conversation to start..."
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/tvPartialTranscript"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="#1976D2"
+                android:textSize="14sp"
+                android:textStyle="italic" />
+
+        </LinearLayout>
     </ScrollView>
 
     <LinearLayout

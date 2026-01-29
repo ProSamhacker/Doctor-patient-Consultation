@@ -9,7 +9,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import coil.load // Make sure you have Coil dependency
+import coil.load
 import coil.transform.CircleCropTransformation
 import com.example.hospitalmanagement.MainViewModel
 import com.example.hospitalmanagement.R
@@ -41,9 +41,7 @@ class ProfileFragment : Fragment() {
         }
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View? {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         val view = inflater.inflate(R.layout.fragment_profile, container, false)
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
@@ -58,8 +56,18 @@ class ProfileFragment : Fragment() {
         fab.setOnClickListener {
             val intent = Intent(requireContext(), ProfileSetupActivity::class.java)
             intent.putExtra("USER_TYPE", userRole)
-            intent.putExtra("IS_EDIT_MODE", true) // Signal to pre-fill data
+            intent.putExtra("IS_EDIT_MODE", true)
             startActivity(intent)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // TRIGGER REALTIME UPDATE
+        if (userRole == "DOCTOR") {
+            viewModel.loadDoctorById(userId)
+        } else {
+            viewModel.loadPatientById(userId)
         }
     }
 
@@ -68,7 +76,6 @@ class ProfileFragment : Fragment() {
         val tvName = view.findViewById<TextView>(R.id.tvProfileName)
         val tvSubtitle = view.findViewById<TextView>(R.id.tvProfileSubtitle)
 
-        // Helper to set row data
         fun setRow(rowId: Int, iconRes: Int, label: String, value: String?) {
             val row = view.findViewById<View>(rowId) ?: return
             row.findViewById<ImageView>(R.id.imgIcon)?.setImageResource(iconRes)
@@ -85,25 +92,14 @@ class ProfileFragment : Fragment() {
                 doc?.let {
                     tvName.text = it.name
                     tvSubtitle.text = it.specialization
-
                     if (it.profileImageUrl.isNotEmpty()) {
                         ivProfile.load(it.profileImageUrl) { transformations(CircleCropTransformation()) }
                     }
-
-                    // Contact
                     setRow(R.id.rowEmail, R.drawable.ic_email, "Email", it.email)
                     setRow(R.id.rowPhone, R.drawable.ic_phone, "Phone", it.phone)
-                    view.findViewById<View>(R.id.rowAddress).visibility = View.GONE
-                    view.findViewById<View>(R.id.divAddress).visibility = View.GONE
-
-                    // Professional
                     setRow(R.id.rowHospital, R.drawable.ic_hospital, "Hospital", it.hospitalName)
                     setRow(R.id.rowExperience, R.drawable.ic_calendar, "Experience", "${it.experienceYears} Years")
-                    setRow(R.id.rowLicense, R.drawable.ic_features, "License", "N/A") // Add field to entity if needed
                     setRow(R.id.rowFee, R.drawable.ic_features, "Consultation Fee", "₹${it.consultationFee}")
-
-                    // Bio (Assume entity has it, or use default)
-                    view.findViewById<TextView>(R.id.tvBio).text = "Experienced ${it.specialization} committed to patient care."
                 }
             }
         } else {
@@ -115,36 +111,16 @@ class ProfileFragment : Fragment() {
                 pat?.let {
                     tvName.text = it.name
                     tvSubtitle.text = "Patient"
-
                     if (it.profileImageUrl.isNotEmpty()) {
                         ivProfile.load(it.profileImageUrl) { transformations(CircleCropTransformation()) }
                     }
-
-                    // Contact
                     setRow(R.id.rowEmail, R.drawable.ic_email, "Email", it.email)
                     setRow(R.id.rowPhone, R.drawable.ic_phone, "Phone", it.phone)
                     setRow(R.id.rowAddress, R.drawable.ic_home, "Address", it.address)
 
-                    // Stats
-                    view.findViewById<TextView>(R.id.blockAge).apply {
-                        text = "${it.age}\nYears"
-                        textAlignment = View.TEXT_ALIGNMENT_CENTER
-                    }
-                    view.findViewById<TextView>(R.id.blockBlood).apply {
-                        text = "${it.bloodGroup}\nBlood"
-                        textAlignment = View.TEXT_ALIGNMENT_CENTER
-                    }
-                    view.findViewById<TextView>(R.id.blockGender).apply {
-                        text = "${it.gender}\nGender"
-                        textAlignment = View.TEXT_ALIGNMENT_CENTER
-                    }
-
-                    // Lists
-                    view.findViewById<TextView>(R.id.tvAllergies).text =
-                        if (it.allergies.isNotEmpty()) it.allergies.joinToString(", ") else "No known allergies"
-
-                    view.findViewById<TextView>(R.id.tvConditions).text =
-                        if (it.chronicConditions.isNotEmpty()) it.chronicConditions.joinToString(", ") else "No chronic conditions"
+                    view.findViewById<TextView>(R.id.blockAge).text = "${it.age}\nYears"
+                    view.findViewById<TextView>(R.id.blockBlood).text = "${it.bloodGroup}\nBlood"
+                    view.findViewById<TextView>(R.id.blockGender).text = "${it.gender}\nGender"
                 }
             }
         }

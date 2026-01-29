@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="8dp"
+    app:cardBackgroundColor="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_ai"
+                app:tint="#4285F4"/>
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="AI Assistant"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#333333"/>
+
+            <ImageButton
+                android:id="@+id/btnCloseAi"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_cancel"
+                app:tint="#999999"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvAiQuery"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Listening..."
+            android:textSize="18sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="8dp"
+            android:fontFamily="sans-serif-medium"/>
+
+        <ProgressBar
+            android:id="@+id/progressBarAi"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginBottom="16dp"
+            android:indeterminate="true"
+            android:indeterminateTint="#4285F4"/>
+
+        <LinearLayout
+            android:id="@+id/layoutAiResponse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:background="@drawable/bg_message_input"
+            android:padding="16dp"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:id="@+id/tvAiResponse"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="AI Response will appear here."
+                android:textSize="16sp"
+                android:textColor="#333333"
+                android:lineSpacingExtra="4dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end"
+                android:layout_marginTop="8dp">
+
+                <ImageView
+                    android:id="@+id/ivSpeaker"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_mic"
+                    app:tint="#4285F4"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="24dp"
+            android:gravity="end">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAiTryAgain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Try Again"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:textColor="#4285F4"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

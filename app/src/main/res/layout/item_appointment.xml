@@ -28,7 +28,7 @@
                 android:text="Rahul Singh"
                 android:textSize="18sp"
                 android:textStyle="bold"
-                android:textColor="#333333"/>
+                android:textColor="#FFFFFF"/>
 
             <TextView
                 android:id="@+id/tvStatus"
@@ -49,11 +49,11 @@
             android:layout_height="wrap_content"
             android:text="Dec 13, 2025 • 10:30 AM"
             android:textSize="13sp"
-            android:textColor="#666666"
+            android:textColor="#CCCCCC"
             android:layout_marginTop="4dp"
             android:drawableStart="@drawable/ic_calendar"
             android:drawablePadding="6dp"
-            android:drawableTint="#666666"/>
+            android:drawableTint="#CCCCCC"/>
 
         <TextView
             android:id="@+id/tvComplaint"
@@ -61,7 +61,7 @@
             android:layout_height="wrap_content"
             android:text="Chief Complaint: Chest pain and shortness of breath"
             android:textSize="14sp"
-            android:textColor="#444444"
+            android:textColor="#E0E0E0"
             android:layout_marginTop="8dp"
             android:lineSpacingExtra="2dp"/>
 
