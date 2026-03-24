@@ -1,32 +1,25 @@
 package com.example.hospitalmanagement.FRAGMENTS
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.hospitalmanagement.ADAPTER.AppointmentAdapter
 import com.example.hospitalmanagement.Appointment
-import com.example.hospitalmanagement.ConsultationActivity
 import com.example.hospitalmanagement.MainViewModel
-import com.example.hospitalmanagement.MedicationSchedule
-import com.example.hospitalmanagement.Prescription
 import com.example.hospitalmanagement.ProfileOverlayDialog
 import com.example.hospitalmanagement.R
+import com.example.hospitalmanagement.ConsultationActivity
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import androidx.lifecycle.lifecycleScope
 
 class AppointmentsFragment : Fragment() {
 
@@ -55,15 +48,13 @@ class AppointmentsFragment : Fragment() {
     }
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+            inflater: LayoutInflater,
+            container: ViewGroup?,
+            savedInstanceState: Bundle?
     ): View? {
         val view = inflater.inflate(R.layout.fragment_appointments, container, false)
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
-
         setupRecyclerView(view)
-
         return view
     }
 
@@ -73,29 +64,40 @@ class AppointmentsFragment : Fragment() {
 
         recyclerView.layoutManager = LinearLayoutManager(context)
 
-        // Initialize Adapter with callbacks wired to the handle functions
         adapter = AppointmentAdapter(
-            appointments = emptyList(),
-            userRole = userRole,
-            onCallClick = { appointment ->
-                handleCallClick(appointment)
-            },
-            onPrescribeClick = { appointment ->
-                handlePrescribeClick(appointment)
-            },
-            onViewClick = { appointment ->
-                handleViewClick(appointment)
-            },
-            onProfileClick = { targetId, targetRole ->
-                // Show Profile Overlay
-                val dialog = ProfileOverlayDialog(targetId, targetRole, viewModel.repository)
-                dialog.show(parentFragmentManager, "ProfileOverlay")
-            }
+                appointments = emptyList(),
+                userRole = userRole,
+                onCallClick = { appointment -> handleCallClick(appointment) },
+                onPrescribeClick = { /* handled via onViewPrescriptionClick */ },
+                onRecordVitalsClick = { appointment ->
+                    val dialog = com.example.hospitalmanagement.VitalSignsDialog.newInstance(
+                            appointment.appId,
+                            appointment.patientId
+                    )
+                    dialog.show(parentFragmentManager, "VitalSigns")
+                },
+                onProfileClick = { targetId, targetRole ->
+                    val dialog = ProfileOverlayDialog(targetId, targetRole, viewModel.repository)
+                    dialog.show(parentFragmentManager, "ProfileOverlay")
+                },
+                onAcceptClick = { appointment ->
+                    viewModel.acceptAppointment(appointment, requireContext())
+                    Toast.makeText(context, "✅ Appointment Accepted", Toast.LENGTH_SHORT).show()
+                },
+                onRejectClick = { appointment ->
+                    viewModel.rejectAppointment(appointment, requireContext())
+                    Toast.makeText(context, "❌ Appointment Rejected", Toast.LENGTH_SHORT).show()
+                },
+                onViewPrescriptionClick = { appointment ->
+                    handleViewPrescriptionClick(appointment)
+                }
         )
 
         recyclerView.adapter = adapter
 
-        // Observe Data
+        // Room Flow → LiveData → UI update. Because Room is the source of truth and
+        // MainViewModel's Firestore listener keeps Room in sync, this auto-refreshes
+        // within seconds of any remote change — no app restart needed.
         viewModel.allAppointments.observe(viewLifecycleOwner) { appointments ->
             if (appointments.isEmpty()) {
                 tvEmpty.visibility = View.VISIBLE
@@ -106,114 +108,44 @@ class AppointmentsFragment : Fragment() {
                 adapter.updateData(appointments)
             }
         }
+
+        viewModel.prescriptions.observe(viewLifecycleOwner) { prescriptions ->
+            val map = prescriptions.associate { it.appId to true }
+            adapter.updatePrescriptionMap(map)
+        }
     }
 
-    // --- 1. CALL FUNCTIONALITY ---
     private fun handleCallClick(appointment: Appointment) {
         lifecycleScope.launch {
-            // Determine who to call based on current user role
-            val phone = if (userRole == "DOCTOR") {
-                viewModel.repository.getPatient(appointment.patientId)?.phone
-            } else {
-                viewModel.repository.getDoctor(appointment.doctorId)?.phone
-            }
-
-            if (!phone.isNullOrBlank()) {
-                val intent = Intent(Intent.ACTION_DIAL)
-                intent.data = Uri.parse("tel:$phone")
-                startActivity(intent)
-            } else {
-                Toast.makeText(context, "Phone number not available", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    // --- 2. PRESCRIBE FUNCTIONALITY ---
-    private fun handlePrescribeClick(appointment: Appointment) {
-        // Inflate the custom dialog layout
-        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_medication, null)
-
-        val etDiagnosis = dialogView.findViewById<EditText>(R.id.etDiagnosis)
-        val etMedication = dialogView.findViewById<EditText>(R.id.etMedicationName)
-        val etInstructions = dialogView.findViewById<EditText>(R.id.etMedicationSection) // Reusing this field for instructions
-
-        // Pre-fill diagnosis if available
-        etDiagnosis.setText(appointment.chiefComplaint)
-
-        AlertDialog.Builder(requireContext())
-            .setTitle("Write Prescription")
-            .setView(dialogView)
-            .setPositiveButton("Submit") { _, _ ->
-                val diagnosis = etDiagnosis.text.toString()
-                val medicationName = etMedication.text.toString()
-                val instructions = etInstructions.text.toString()
-
-                if (diagnosis.isNotBlank() && medicationName.isNotBlank()) {
-                    savePrescription(appointment, diagnosis, medicationName, instructions)
-                } else {
-                    Toast.makeText(context, "Please fill required details", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun savePrescription(appointment: Appointment, diagnosis: String, medName: String, instructions: String) {
-        lifecycleScope.launch {
             try {
-                // Create a basic medication schedule object
-                val medication = MedicationSchedule(
-                    medicationName = medName,
-                    dosage = "1 tablet",
-                    frequency = "Twice Daily",
-                    duration = "5 Days",
-                    timing = "After Food"
-                )
-
-                val prescription = Prescription(
-                    appId = appointment.appId,
-                    diagnosis = diagnosis,
-                    medications = listOf(medication),
-                    instructions = instructions.ifBlank { "Take exactly as prescribed." }
-                )
-
-                // Call ViewModel to save to DB
-                viewModel.createPrescription(prescription)
-                Toast.makeText(context, "Prescription sent successfully!", Toast.LENGTH_SHORT).show()
+                // Now we launch the unified AI Consultation Dashboard instead of a raw Jitsi window
+                val intent = Intent(requireContext(), ConsultationActivity::class.java).apply {
+                    putExtra("APP_ID", appointment.appId)
+                    putExtra("USER_ROLE", userRole)
+                    putExtra("USER_ID", userId)
+                }
+                startActivity(intent)
             } catch (e: Exception) {
-                Toast.makeText(context, "Failed to send: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Error launching consultation: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    // --- 3. VIEW DETAILS FUNCTIONALITY ---
-    private fun handleViewClick(appointment: Appointment) {
-        // If it's a consultation, open the Activity
-        if (appointment.status != com.example.hospitalmanagement.AppointmentStatus.SCHEDULED) {
-            val intent = Intent(requireContext(), ConsultationActivity::class.java)
-            intent.putExtra("APP_ID", appointment.appId)
-            intent.putExtra("USER_ROLE", userRole)
-            startActivity(intent)
-            return
+    private fun handleViewPrescriptionClick(appointment: Appointment) {
+        lifecycleScope.launch {
+            val prescription = viewModel.repository.getPrescription(appointment.appId)
+            if (prescription != null) {
+                val medsList = prescription.medications.joinToString("\n") {
+                    "- ${it.medicationName} (${it.dosage})"
+                }
+                AlertDialog.Builder(requireContext())
+                        .setTitle("Prescription")
+                        .setMessage("💊 Diagnosis: ${prescription.diagnosis}\n\n📋 Medications:\n$medsList\n\n📝 Instructions: ${prescription.instructions}")
+                        .setPositiveButton("Close", null)
+                        .show()
+            } else {
+                Toast.makeText(context, "No prescription found.", Toast.LENGTH_SHORT).show()
+            }
         }
-
-        // Otherwise show simple dialog
-        val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-        val dateStr = sdf.format(Date(appointment.dateTime))
-
-        val message = """
-            📅 Date: $dateStr
-            🆔 Token: ${appointment.tokenNumber}
-            📝 Complaint: ${appointment.chiefComplaint}
-            📌 Status: ${appointment.status}
-            📋 Type: ${appointment.type}
-            ⏱ Duration: ${appointment.estimatedDuration} mins
-        """.trimIndent()
-
-        AlertDialog.Builder(requireContext())
-            .setTitle("Appointment Details")
-            .setMessage(message)
-            .setPositiveButton("Close", null)
-            .show()
     }
 }

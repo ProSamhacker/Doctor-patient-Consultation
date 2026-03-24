@@ -8,9 +8,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.hospitalmanagement.databinding.ActivityBookAppointmentBinding
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.launch
 
 class BookAppointmentActivity : AppCompatActivity() {
 
@@ -30,13 +30,29 @@ class BookAppointmentActivity : AppCompatActivity() {
         doctorName = intent.getStringExtra("DOCTOR_NAME") ?: ""
         userId = intent.getStringExtra("USER_ID") ?: ""
 
+        // Validation to prevent crashes later
+        if (doctorId.isEmpty() || userId.isEmpty()) {
+            Toast.makeText(this, "Error: Missing user or doctor info", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+
         val database = AppDatabase.getDatabase(this)
-        val repository = HospitalRepository(
-            database.doctorDao(), database.patientDao(), database.appointmentDao(),
-            database.prescriptionDao(), database.messageDao(), database.consultationSessionDao(),
-            database.aiExtractionDao(), database.medicalReportDao(), database.vitalSignsDao(),
-            database.notificationDao(), database.emergencyContactDao(), database.medicationDao()
-        )
+        val repository =
+                HospitalRepository(
+                        database.doctorDao(),
+                        database.patientDao(),
+                        database.appointmentDao(),
+                        database.prescriptionDao(),
+                        database.messageDao(),
+                        database.consultationSessionDao(),
+                        database.aiExtractionDao(),
+                        database.medicalReportDao(),
+                        database.vitalSignsDao(),
+                        database.notificationDao(),
+                        database.emergencyContactDao(),
+                        database.medicationDao()
+                )
         val factory = MainViewModel.Factory(repository, userId, "PATIENT")
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 
@@ -49,18 +65,19 @@ class BookAppointmentActivity : AppCompatActivity() {
 
         // Date picker
         binding.btnSelectDate.setOnClickListener {
-            val datePicker = DatePickerDialog(
-                this,
-                { _, year, month, day ->
-                    selectedDateTime.set(Calendar.YEAR, year)
-                    selectedDateTime.set(Calendar.MONTH, month)
-                    selectedDateTime.set(Calendar.DAY_OF_MONTH, day)
-                    updateDateTimeDisplay()
-                },
-                selectedDateTime.get(Calendar.YEAR),
-                selectedDateTime.get(Calendar.MONTH),
-                selectedDateTime.get(Calendar.DAY_OF_MONTH)
-            )
+            val datePicker =
+                    DatePickerDialog(
+                            this,
+                            { _, year, month, day ->
+                                selectedDateTime.set(Calendar.YEAR, year)
+                                selectedDateTime.set(Calendar.MONTH, month)
+                                selectedDateTime.set(Calendar.DAY_OF_MONTH, day)
+                                updateDateTimeDisplay()
+                            },
+                            selectedDateTime.get(Calendar.YEAR),
+                            selectedDateTime.get(Calendar.MONTH),
+                            selectedDateTime.get(Calendar.DAY_OF_MONTH)
+                    )
             datePicker.datePicker.minDate = System.currentTimeMillis()
             datePicker.show()
         }
@@ -68,22 +85,21 @@ class BookAppointmentActivity : AppCompatActivity() {
         // Time picker
         binding.btnSelectTime.setOnClickListener {
             TimePickerDialog(
-                this,
-                { _, hour, minute ->
-                    selectedDateTime.set(Calendar.HOUR_OF_DAY, hour)
-                    selectedDateTime.set(Calendar.MINUTE, minute)
-                    updateDateTimeDisplay()
-                },
-                selectedDateTime.get(Calendar.HOUR_OF_DAY),
-                selectedDateTime.get(Calendar.MINUTE),
-                false
-            ).show()
+                            this,
+                            { _, hour, minute ->
+                                selectedDateTime.set(Calendar.HOUR_OF_DAY, hour)
+                                selectedDateTime.set(Calendar.MINUTE, minute)
+                                updateDateTimeDisplay()
+                            },
+                            selectedDateTime.get(Calendar.HOUR_OF_DAY),
+                            selectedDateTime.get(Calendar.MINUTE),
+                            false
+                    )
+                    .show()
         }
 
         // Book appointment
-        binding.btnBookAppointment.setOnClickListener {
-            bookAppointment()
-        }
+        binding.btnBookAppointment.setOnClickListener { bookAppointment() }
 
         updateDateTimeDisplay()
     }
@@ -114,20 +130,38 @@ class BookAppointmentActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
+                // Now calling the suspend function. Execution waits here.
                 viewModel.createAppointment(
-                    doctorId = doctorId,
-                    patientId = userId,
-                    dateTime = selectedDateTime.timeInMillis,
-                    chiefComplaint = complaint
+                        doctorId = doctorId,
+                        patientId = userId,
+                        dateTime = selectedDateTime.timeInMillis,
+                        chiefComplaint = complaint,
+                        context = this@BookAppointmentActivity
                 )
 
+                // If we reach here, it succeeded
                 binding.progressBar.visibility = android.view.View.GONE
-                Toast.makeText(this@BookAppointmentActivity, "Appointment booked successfully!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                                this@BookAppointmentActivity,
+                                "Appointment booked successfully!",
+                                Toast.LENGTH_SHORT
+                        )
+                        .show()
                 finish()
             } catch (e: Exception) {
+                // If it fails, we catch the exception (including the ones re-thrown by ViewModel)
                 binding.progressBar.visibility = android.view.View.GONE
                 binding.btnBookAppointment.isEnabled = true
-                Toast.makeText(this@BookAppointmentActivity, "Booking failed: ${e.message}", Toast.LENGTH_SHORT).show()
+
+                val errorMsg =
+                        if (e.message?.contains("FOREIGN KEY") == true) {
+                            "Error: Doctor details syncing failed. Please try again."
+                        } else {
+                            "Booking failed: ${e.message}"
+                        }
+
+                Toast.makeText(this@BookAppointmentActivity, errorMsg, Toast.LENGTH_LONG).show()
+                e.printStackTrace()
             }
         }
     }

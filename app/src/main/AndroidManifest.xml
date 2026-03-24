@@ -8,18 +8,30 @@
     <uses-feature
         android:name="android.hardware.microphone"
         android:required="true" />
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
+        android:name=".HospitalApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -80,6 +92,58 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.Hospitalmanagement" />
 
+        <activity
+            android:name=".VideoCallActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize"
+            android:theme="@style/Theme.Hospitalmanagement" />
+
+        <activity
+            android:name=".PostCallInsightActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Hospitalmanagement" />
+
+        <activity
+            android:name=".AiAssistantActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Hospitalmanagement" />
+
+        <!-- Receiver for notification actions (Accept/Reject) -->
+
+        <receiver
+            android:name=".NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.hospitalmanagement.ACTION_ACCEPT_APPOINTMENT" />
+                <action android:name="com.example.hospitalmanagement.ACTION_REJECT_APPOINTMENT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- FCM Service: handles incoming push notifications & token refresh -->
+        <service
+            android:name=".HospitalFcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!--
+            Disable JitsiMeetOngoingConferenceService to prevent a fatal crash on Android 14+.
+            The SDK's service internally calls startForeground() with FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            in its Java code — this requires a runtime screen-capture token we never obtain.
+            Disabling the service prevents it from ever being created, avoiding the SecurityException.
+            The actual WebRTC video/audio call is unaffected; only the persistent notification is lost.
+        -->
+        <service
+            android:name="org.jitsi.meet.sdk.JitsiMeetOngoingConferenceService"
+            android:enabled="false"
+            tools:node="merge" />
+
     </application>
+
 
 </manifest>

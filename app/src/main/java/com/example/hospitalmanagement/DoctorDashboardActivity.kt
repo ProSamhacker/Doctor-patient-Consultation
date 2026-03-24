@@ -64,7 +64,12 @@ class DoctorDashboardActivity : AppCompatActivity() {
         userId = intent.getStringExtra("USER_ID") ?: ""
         userRole = intent.getStringExtra("USER_ROLE") ?: "DOCTOR"
 
-        // 2. Setup Database & ViewModel
+        // 2. Save FCM token so patients can send cross-device push notifications
+        if (userId.isNotEmpty()) {
+            FcmTokenManager.saveTokenForUser(userId)
+        }
+
+        // 3. Setup Database & ViewModel
         val database = AppDatabase.getDatabase(this)
         repository = HospitalRepository(
             database.doctorDao(), database.patientDao(), database.appointmentDao(),
@@ -75,10 +80,10 @@ class DoctorDashboardActivity : AppCompatActivity() {
         val factory = MainViewModel.Factory(repository, userId, userRole)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 
-        // 3. Initialize Voice Service
+        // 4. Initialize Voice Service
         setupVoiceService()
 
-        // 4. Start Appointment Monitoring
+        // 5. Start Appointment Monitoring
         AppointmentScheduler.startMonitoring(
             context = this,
             scope = lifecycleScope,
@@ -282,12 +287,18 @@ class DoctorDashboardActivity : AppCompatActivity() {
     }
 
     private fun performLogout() {
+        // Clear FCM Token before logging out
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId != null) {
+            FcmTokenManager.clearTokenForUser(userId)
+        }
+
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
         val googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         googleSignInClient.signOut().addOnCompleteListener(this) {
             FirebaseAuth.getInstance().signOut()
-            val intent = Intent(this, AuthActivity::class.java)
+            val intent = Intent(this, com.example.hospitalmanagement.auth.AuthActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)
             finish()

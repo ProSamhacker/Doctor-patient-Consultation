@@ -7,6 +7,10 @@ interface MessageDao {
     @Insert
     suspend fun insert(message: Message): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertOrIgnore(message: Message): Long
+
+
     @Update
     suspend fun update(message: Message)
 

@@ -16,10 +16,11 @@ import java.util.Date
 import java.util.Locale
 
 class NotificationAdapter(
-    private var notifications: List<NotificationEntity>,
-    private val onNotificationClick: (NotificationEntity) -> Unit,
-    // New callback for actions
-    private val onActionClick: (NotificationEntity, Boolean) -> Unit // Boolean: true = Accept, false = Reject
+        private var notifications: List<NotificationEntity>,
+        private val onNotificationClick: (NotificationEntity) -> Unit,
+        // New callback for actions
+        private val onActionClick:
+                (NotificationEntity, Boolean) -> Unit // Boolean: true = Accept, false = Reject
 ) : RecyclerView.Adapter<NotificationAdapter.ViewHolder>() {
 
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -36,8 +37,9 @@ class NotificationAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_notification, parent, false)
+        val view =
+                LayoutInflater.from(parent.context)
+                        .inflate(R.layout.item_notification, parent, false)
         return ViewHolder(view)
     }
 
@@ -50,29 +52,34 @@ class NotificationAdapter(
         holder.vUnreadIndicator.visibility = if (notification.isRead) View.GONE else View.VISIBLE
 
         // Icon Logic
-        holder.ivIcon.setImageResource(when (notification.type) {
-            NotificationType.APPOINTMENT_REMINDER -> R.drawable.ic_calendar
-            NotificationType.APPOINTMENT_CONFIRMED -> R.drawable.ic_check
-            NotificationType.APPOINTMENT_CANCELLED -> R.drawable.ic_cancel
-            NotificationType.PRESCRIPTION_READY -> R.drawable.ic_prescription
-            NotificationType.MESSAGE_RECEIVED -> R.drawable.ic_chat
-            NotificationType.LAB_RESULT_READY -> R.drawable.ic_lab
-            NotificationType.EMERGENCY -> R.drawable.ic_emergency
-            NotificationType.INFO -> R.drawable.ic_info
-        })
+        holder.ivIcon.setImageResource(
+                when (notification.type) {
+                    NotificationType.APPOINTMENT_REQUEST -> R.drawable.ic_calendar
+                    NotificationType.APPOINTMENT_ACCEPTED -> R.drawable.ic_check
+                    NotificationType.APPOINTMENT_CANCELLED -> R.drawable.ic_cancel
+                    NotificationType.PRESCRIPTION_READY -> R.drawable.ic_prescription
+                    NotificationType.MESSAGE_RECEIVED -> R.drawable.ic_chat
+                    NotificationType.LAB_RESULT_READY -> R.drawable.ic_lab
+                    NotificationType.EMERGENCY -> R.drawable.ic_emergency
+                    NotificationType.INFO -> R.drawable.ic_info
+                }
+        )
 
         // --- ACTION LOGIC ---
-        // Show buttons only if title is "Appointment Request" and it hasn't been handled (read)
-        if (notification.title == "Appointment Request" && !notification.isRead) {
+        // Show Accept/Reject buttons ONLY if ALL conditions are met:
+        // 1. Notification type is APPOINTMENT_REQUEST (not confirmation or other)
+        // 2. User is a DOCTOR (patients never see these buttons)
+        // 3. Notification is NOT read (once action is taken, it's marked as read)
+        // This ensures buttons NEVER reappear after doctor accepts/rejects
+        if (notification.type == NotificationType.APPOINTMENT_REQUEST &&
+                        notification.userType == "DOCTOR" &&
+                        !notification.isRead
+        ) {
             holder.layoutActions.visibility = View.VISIBLE
 
-            holder.btnAccept.setOnClickListener {
-                onActionClick(notification, true)
-            }
+            holder.btnAccept.setOnClickListener { onActionClick(notification, true) }
 
-            holder.btnReject.setOnClickListener {
-                onActionClick(notification, false)
-            }
+            holder.btnReject.setOnClickListener { onActionClick(notification, false) }
         } else {
             holder.layoutActions.visibility = View.GONE
         }

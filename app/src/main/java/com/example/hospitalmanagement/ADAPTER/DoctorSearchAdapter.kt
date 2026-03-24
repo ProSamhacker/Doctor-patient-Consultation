@@ -1,4 +1,6 @@
 package com.example.hospitalmanagement.ADAPTER
+
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -33,25 +35,34 @@ class DoctorSearchAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val doctor = doctors[position]
+        Log.d("DoctorAdapter", "Binding doctor: ${doctor.name}")
 
-        holder.tvName.text = doctor.name
+        holder.tvName.text = "Dr. ${doctor.name}"
         holder.tvSpecialization.text = doctor.specialization
         holder.tvHospital.text = doctor.hospitalName
         holder.tvRating.text = "⭐ ${doctor.rating}"
         holder.tvFee.text = "₹${doctor.consultationFee}"
-        holder.tvAvailability.text = if (doctor.isActive) "Available" else "Unavailable"
-        holder.tvAvailability.setTextColor(
-            if (doctor.isActive) 0xFF4CAF50.toInt() else 0xFFF44336.toInt()
-        )
+
+        if (doctor.isActive) {
+            holder.tvAvailability.text = "Available"
+            holder.tvAvailability.setTextColor(0xFF4CAF50.toInt()) // Green
+        } else {
+            holder.tvAvailability.text = "Unavailable"
+            holder.tvAvailability.setTextColor(0xFFF44336.toInt()) // Red
+        }
 
         holder.btnBook.setOnClickListener { onDoctorClick(doctor) }
         holder.itemView.setOnClickListener { onDoctorClick(doctor) }
     }
 
-    override fun getItemCount() = doctors.size
+    override fun getItemCount(): Int {
+        Log.d("DoctorAdapter", "Item count: ${doctors.size}")
+        return doctors.size
+    }
 
     fun updateData(newDoctors: List<Doctor>) {
-        doctors = newDoctors
+        Log.d("DoctorAdapter", "Updating data with ${newDoctors.size} items")
+        this.doctors = newDoctors
         notifyDataSetChanged()
     }
 }

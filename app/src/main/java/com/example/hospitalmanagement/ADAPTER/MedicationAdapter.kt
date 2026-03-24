@@ -3,38 +3,59 @@ package com.example.hospitalmanagement.ADAPTER
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.example.hospitalmanagement.Medication
+import com.example.hospitalmanagement.MedicationSchedule
 import com.example.hospitalmanagement.R
+import com.google.android.material.button.MaterialButton
 
-class MedicationAdapter(private var items: List<Medication>) :
-    RecyclerView.Adapter<MedicationAdapter.MedViewHolder>() {
+data class MedicationTrackerItem(val schedule: MedicationSchedule, var isTaken: Boolean = false)
 
-    inner class MedViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val medId: TextView = itemView.findViewById(R.id.medId)
-        val medName: TextView = itemView.findViewById(R.id.medName)
-        val medSection: TextView = itemView.findViewById(R.id.medSection)
-    }
+class MedicationAdapter(
+        private var items: List<MedicationTrackerItem>,
+        private val onTakeClick: (MedicationTrackerItem) -> Unit
+) : RecyclerView.Adapter<MedicationAdapter.ViewHolder>() {
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MedViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_medication, parent, false)
-        return MedViewHolder(view)
-    }
-
-    override fun onBindViewHolder(holder: MedViewHolder, position: Int) {
-        val med = items[position]
-        holder.medId.text = (position + 1).toString()   // SR No instead of DB id
-        holder.medName.text = med.name
-        holder.medSection.text = med.section
-    }
-
-
-    override fun getItemCount(): Int = items.size
-
-    fun updateData(newItems: List<Medication>) {
+    fun updateData(newItems: List<MedicationTrackerItem>) {
         items = newItems
         notifyDataSetChanged()
     }
+
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val tvName: TextView = view.findViewById(R.id.tvMedName)
+        val tvDetails: TextView = view.findViewById(R.id.tvMedDetails)
+        val btnTake: MaterialButton = view.findViewById(R.id.btnMarkTaken)
+        val ivCheck: ImageView = view.findViewById(R.id.ivTakenCheck)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view =
+                LayoutInflater.from(parent.context)
+                        .inflate(R.layout.item_medication_schedule, parent, false)
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val item = items[position]
+        val schedule = item.schedule
+
+        holder.tvName.text = schedule.medicationName
+        holder.tvDetails.text = "${schedule.dosage} • ${schedule.timing}"
+
+        if (item.isTaken) {
+            holder.btnTake.visibility = View.GONE
+            holder.ivCheck.visibility = View.VISIBLE
+        } else {
+            holder.btnTake.visibility = View.VISIBLE
+            holder.ivCheck.visibility = View.GONE
+            holder.btnTake.setOnClickListener {
+                onTakeClick(item)
+                item.isTaken = true // Optimistic update
+                notifyItemChanged(position)
+            }
+        }
+    }
+
+    override fun getItemCount() = items.size
 }

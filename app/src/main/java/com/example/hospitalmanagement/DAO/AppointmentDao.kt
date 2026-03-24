@@ -6,6 +6,9 @@ import com.example.hospitalmanagement.AppointmentWithDetails
 import kotlinx.coroutines.flow.Flow
 @Dao
 interface AppointmentDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrReplace(appointment: Appointment): Long
+
     @Insert
     suspend fun insert(appointment: Appointment): Long
 

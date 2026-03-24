@@ -16,7 +16,7 @@ class VoiceRecognitionService(
     private val context: Context,
     private val onResult: (String) -> Unit,
     private val onError: (String) -> Unit,
-    private val onPartialResult: ((String) -> Unit)? = null // Default null for backward compatibility
+    private val onPartialResult: ((String) -> Unit)? = null
 ) : RecognitionListener {
 
     private var speechRecognizer: SpeechRecognizer? = null
@@ -88,12 +88,18 @@ class VoiceRecognitionService(
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
 
                 if (continuous) {
-                    // Optimized for dictation
+                    // Optimized for dictation (Consultation Mode)
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000)
                 } else {
-                    // Optimized for commands
-                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1000)
+                    // Optimized for Assistant Mode (FIXED: Increased timeouts)
+                    // Give user 3 seconds of silence before cutting off (was 1000ms)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000)
+                    // Give user 3 seconds of pause before cutting off
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000)
+                    // Force minimum recording length to prevent instant close
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500)
                 }
             }
 
@@ -154,14 +160,15 @@ class VoiceRecognitionService(
     override fun onEndOfSpeech() {
         isListening = false
         if (!continuousMode) {
-            // Assistant Mode: Wait 500ms for final result, else use partial
-            mainHandler.postDelayed(resultTimeoutRunnable, 500)
+            // Assistant Mode: Wait 1500ms (increased from 500ms) for final result to arrive from server
+            // This prevents "I didn't catch that" appearing while the server is still processing
+            mainHandler.postDelayed(resultTimeoutRunnable, 1500)
         }
         // Continuous Mode: Do nothing, wait for onResults or onError to restart
     }
 
     override fun onError(error: Int) {
-        // Ignore "Client side" errors that happen during init
+        // Ignore "Client side" errors that happen during init or double-start
         if (error == SpeechRecognizer.ERROR_CLIENT) return
 
         // 1. Handle Continuous Mode Restarts (Silence/Timeout/NoMatch)
@@ -174,6 +181,7 @@ class VoiceRecognitionService(
         }
 
         // 2. Handle Assistant Mode Fallbacks
+        // If we have a partial result, use it even if we got a No Match or Timeout error
         if (!continuousMode && lastPartialResult.isNotBlank() && (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)) {
             mainHandler.removeCallbacks(resultTimeoutRunnable)
             onResult(lastPartialResult)
@@ -185,6 +193,7 @@ class VoiceRecognitionService(
             SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected"
             SpeechRecognizer.ERROR_NETWORK -> "Network error"
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Permission denied"
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
             else -> "Error code: $error"
         }
 
@@ -201,7 +210,13 @@ class VoiceRecognitionService(
 
         if (text.isNotBlank()) {
             onResult(text)
+        } else {
+            // If results came back empty but we had partials, use the partial
+            if (lastPartialResult.isNotBlank()) {
+                onResult(lastPartialResult)
+            }
         }
+
         isListening = false
 
         if (continuousMode && shouldRestart) {
@@ -214,6 +229,14 @@ class VoiceRecognitionService(
         if (!matches.isNullOrEmpty()) {
             lastPartialResult = matches[0]
             onPartialResult?.invoke(lastPartialResult) // Call the callback for live UI
+
+            // Reset the timeout runnable every time we hear something new
+            // This keeps the session alive while the user is actively speaking
+            if (!continuousMode) {
+                mainHandler.removeCallbacks(resultTimeoutRunnable)
+                // Wait longer if user pauses mid-sentence
+                mainHandler.postDelayed(resultTimeoutRunnable, 2000)
+            }
         }
     }
 

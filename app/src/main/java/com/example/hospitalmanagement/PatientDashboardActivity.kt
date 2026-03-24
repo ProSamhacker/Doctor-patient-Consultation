@@ -3,9 +3,11 @@ package com.example.hospitalmanagement
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
-import android.widget.ImageButton // Import ImageButton
+import android.view.View
+import android.widget.ImageButton
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -22,9 +24,10 @@ import com.example.hospitalmanagement.auth.AuthActivity
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.launch
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class PatientDashboardActivity : AppCompatActivity() {
 
@@ -33,10 +36,16 @@ class PatientDashboardActivity : AppCompatActivity() {
     private var userId: String = ""
     private var userRole: String = "PATIENT"
 
+    // Voice & AI Components
+    private var voiceService: VoiceRecognitionService? = null
+    private var aiDialog: AlertDialog? = null
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        if (permissions[Manifest.permission.RECORD_AUDIO] == false) {
+        if (permissions[Manifest.permission.RECORD_AUDIO] == true) {
+            showAiAssistantDialog()
+        } else {
             Toast.makeText(this, "Microphone needed for voice features", Toast.LENGTH_LONG).show()
         }
     }
@@ -48,6 +57,11 @@ class PatientDashboardActivity : AppCompatActivity() {
         userId = intent.getStringExtra("USER_ID") ?: ""
         userRole = intent.getStringExtra("USER_ROLE") ?: "PATIENT"
 
+        // Save FCM token so doctors can send cross-device push notifications
+        if (userId.isNotEmpty()) {
+            FcmTokenManager.saveTokenForUser(userId)
+        }
+
         val database = AppDatabase.getDatabase(this)
         repository = HospitalRepository(
             database.doctorDao(), database.patientDao(), database.appointmentDao(),
@@ -57,6 +71,7 @@ class PatientDashboardActivity : AppCompatActivity() {
         )
         val factory = MainViewModel.Factory(repository, userId, userRole)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
+
         AppointmentScheduler.startMonitoring(
             context = this,
             scope = lifecycleScope,
@@ -65,60 +80,38 @@ class PatientDashboardActivity : AppCompatActivity() {
             userRole = "PATIENT"
         )
         setupUI(savedInstanceState)
-        checkPermissions()
     }
+
     override fun onDestroy() {
         super.onDestroy()
         AppointmentScheduler.stopMonitoring()
     }
+
+
+
     private fun setupUI(savedInstanceState: Bundle?) {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNavigationViewPatient)
         val fabMic = findViewById<FloatingActionButton>(R.id.fabMicPatient)
         val containerId = R.id.fragment_container_patient
-        // Inside setupUI or onCreate of Dashboard
-        lifecycleScope.launch {
-            // Poll every minute
-            while (true) {
-                val now = System.currentTimeMillis()
-                // Simple check: Look for accepted appointments +/- 1 minute from now
-                viewModel.allAppointments.value?.find { appt ->
-                    val diff = Math.abs(appt.dateTime - now)
-                    // 60000ms = 1 minute tolerance
-                    diff < 60000 && appt.status == AppointmentStatus.SCHEDULED
-                }?.let { appointment ->
-                    // Found a meeting starting NOW
-                    AppointmentScheduler.triggerMeetingNotification(
-                        this@PatientDashboardActivity, // or PatientDashboardActivity
-                        appointment.appId,
-                        userId,
-                        userRole
-                    )
-                    // Prevent spamming
-                    kotlinx.coroutines.delay(60000)
-                }
-                kotlinx.coroutines.delay(30000) // Check every 30 seconds
-            }
-        }
-        // --- SEARCH LOGIC START ---
-        val btnSearch = findViewById<ImageButton>(R.id.btnSearchPatient)
-        btnSearch.setOnClickListener {
+
+        // AppointmentScheduler.startMonitoring already handles notifications.
+        // Removed duplicate polling loop here.
+
+        findViewById<ImageButton>(R.id.btnSearchPatient).setOnClickListener {
             val intent = Intent(this, SearchActivity::class.java)
             intent.putExtra("USER_ID", userId)
             intent.putExtra("USER_ROLE", userRole)
             startActivity(intent)
         }
-        // --- SEARCH LOGIC END ---
 
-        // --- LOGOUT LOGIC START ---
-        val btnLogout = findViewById<ImageButton>(R.id.btnLogoutPatient)
-        btnLogout?.setOnClickListener {
-            performLogout()
+        // Notification Button Handler
+        findViewById<ImageButton>(R.id.btnNotifications).setOnClickListener {
+            Toast.makeText(this, "No new notifications", Toast.LENGTH_SHORT).show()
+            // In a real implementation, you would open a NotificationFragment or Dialog here
         }
-        // --- LOGOUT LOGIC END ---
 
-        if (bottomNav == null || fabMic == null) {
-            Toast.makeText(this, "Error: Dashboard views not found.", Toast.LENGTH_LONG).show()
-            return
+        findViewById<ImageButton>(R.id.btnLogoutPatient)?.setOnClickListener {
+            performLogout()
         }
 
         if (savedInstanceState == null) {
@@ -146,11 +139,10 @@ class PatientDashboardActivity : AppCompatActivity() {
         }
 
         fabMic.setOnClickListener {
-            val fragment = supportFragmentManager.findFragmentById(containerId)
-            if (fragment is PatientHomeFragment) {
-                fragment.openLaymanTranslator()
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                showAiAssistantDialog()
             } else {
-                bottomNav.selectedItemId = R.id.nav_home
+                permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
             }
         }
 
@@ -159,18 +151,35 @@ class PatientDashboardActivity : AppCompatActivity() {
             true
         }
     }
+
+    private fun setupVoiceService() {
+        // Obsolete — AI now uses full-screen AiAssistantActivity
+    }
+
+    fun showAiAssistantDialog() {
+        val intent = Intent(this, AiAssistantActivity::class.java).apply {
+            putExtra("USER_ID", userId)
+            putExtra("USER_ROLE", userRole)
+        }
+        startActivity(intent)
+    }
+
+    private fun handleAiQuery(query: String) {
+        // Obsolete — Handled in AiAssistantActivity
+    }
+
     private fun performLogout() {
-        // 1. Configure Google Sign In options (just to get the client)
+        // Clear FCM Token before logging out
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId != null) {
+            FcmTokenManager.clearTokenForUser(userId)
+        }
+
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
         val googleSignInClient = GoogleSignIn.getClient(this, gso)
-
-        // 2. Sign out of Google Client FIRST
         googleSignInClient.signOut().addOnCompleteListener(this) {
-            // 3. Then Sign out of Firebase
             FirebaseAuth.getInstance().signOut()
-
-            // 4. Return to Login Screen
-            val intent = Intent(this, AuthActivity::class.java)
+            val intent = Intent(this, com.example.hospitalmanagement.auth.AuthActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)
             finish()
@@ -203,12 +212,6 @@ class PatientDashboardActivity : AppCompatActivity() {
             } else {
                 Toast.makeText(this@PatientDashboardActivity, "No doctor assigned", Toast.LENGTH_SHORT).show()
             }
-        }
-    }
-
-    private fun checkPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
         }
     }
 }

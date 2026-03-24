@@ -2,6 +2,7 @@ package com.example.hospitalmanagement
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.view.View
@@ -27,8 +28,6 @@ class ConsultationActivity : AppCompatActivity() {
     private var userId: String = ""
     private var userRole: String = ""
     private var voiceService: VoiceRecognitionService? = null
-
-    // Ensure you have GeminiConversationAssistant.kt created, or comment this out
     private var aiAssistant: GeminiConversationAssistant? = null
 
     // UI Elements
@@ -38,6 +37,7 @@ class ConsultationActivity : AppCompatActivity() {
     private lateinit var tvTranscript: TextView
     private lateinit var tvPartialTranscript: TextView
     private lateinit var btnMic: ImageButton
+    private lateinit var btnVideoCall: ImageButton
 
     // AI Insights UI
     private lateinit var layoutAiInsights: View
@@ -51,8 +51,10 @@ class ConsultationActivity : AppCompatActivity() {
 
     private val firestore = FirebaseFirestore.getInstance()
     private var waitTimer: CountDownTimer? = null
+    private var durationTimer: CountDownTimer? = null // To show duration
     private var isMicOn = true
     private var otherPartyJoined = false
+    private var sessionStartTime: Long = 0
     private var fullTranscript = StringBuilder()
     private var lastAiAnalysisLength = 0
 
@@ -66,7 +68,6 @@ class ConsultationActivity : AppCompatActivity() {
 
         if (appointmentId == 0) finish()
 
-        // Init ViewModel
         val database = AppDatabase.getDatabase(this)
         val repository = HospitalRepository(
             database.doctorDao(), database.patientDao(), database.appointmentDao(),
@@ -77,11 +78,9 @@ class ConsultationActivity : AppCompatActivity() {
         val factory = MainViewModel.Factory(repository, userId, userRole)
         viewModel = ViewModelProvider(this, factory)[MainViewModel::class.java]
 
-        // Initialize AI Assistant
         try {
             aiAssistant = GeminiConversationAssistant(BuildConfig.GEMINI_API_KEY)
         } catch (e: Exception) {
-            // Handle if class is missing or key issue
             aiAssistant = null
         }
 
@@ -98,7 +97,6 @@ class ConsultationActivity : AppCompatActivity() {
         tvTranscript = findViewById(R.id.tvFullTranscript)
         tvPartialTranscript = findViewById(R.id.tvPartialTranscript)
 
-        // AI Insights
         layoutAiInsights = findViewById(R.id.layoutAiInsights)
         tvSeverity = findViewById(R.id.tvSeverity)
         tvSymptoms = findViewById(R.id.tvSymptoms)
@@ -107,28 +105,32 @@ class ConsultationActivity : AppCompatActivity() {
         tvDiagnosis = findViewById(R.id.tvDiagnosis)
         layoutRedFlags = findViewById(R.id.layoutRedFlags)
         btnRefreshInsights = findViewById(R.id.btnRefreshInsights)
+        // Mic is hidden — transcription happens inside the Jitsi video call (VideoCallActivity)
         btnMic = findViewById(R.id.btnMicToggle)
+        btnMic.visibility = View.GONE
+        btnVideoCall = findViewById(R.id.btnVideoCall)
 
-        findViewById<ImageButton>(R.id.btnEndCall).setOnClickListener {
-            endMeeting()
-        }
+        findViewById<ImageButton>(R.id.btnEndCall).setOnClickListener { endMeeting() }
 
-        btnMic.setOnClickListener {
-            isMicOn = !isMicOn
-            if (isMicOn) {
-                // FIXED: Now VoiceRecognitionService accepts continuous param
-                voiceService?.startListening(continuous = true)
-                btnMic.setImageResource(R.drawable.ic_mic)
-                btnMic.setColorFilter(0xFF4CAF50.toInt())
-            } else {
-                voiceService?.stopListening()
-                btnMic.setImageResource(R.drawable.ic_mic_off)
-                btnMic.setColorFilter(0xFF9E9E9E.toInt())
+        btnVideoCall.setOnClickListener { launchVideoCall() }
+
+        btnRefreshInsights.setOnClickListener { refreshAiInsights() }
+    }
+
+    private fun launchVideoCall() {
+        lifecycleScope.launch {
+            try {
+                val intent = Intent(this@ConsultationActivity, VideoCallActivity::class.java).apply {
+                    putExtra("APPOINTMENT_ID", appointmentId)
+                    putExtra("USER_ROLE", userRole)
+                    putExtra("USER_ID", userId)
+                    putExtra("DOCTOR_NAME", "Doctor")
+                    putExtra("PATIENT_NAME", "Patient")
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(this@ConsultationActivity, "Error launching video: ${e.message}", Toast.LENGTH_SHORT).show()
             }
-        }
-
-        btnRefreshInsights.setOnClickListener {
-            refreshAiInsights()
         }
     }
 
@@ -136,14 +138,10 @@ class ConsultationActivity : AppCompatActivity() {
         val statusField = if (userRole == "DOCTOR") "doctorJoined" else "patientJoined"
         val meetingRef = firestore.collection("appointments").document(appointmentId.toString())
 
-        meetingRef.update(statusField, true)
-            .addOnFailureListener {
-                val data = hashMapOf(
-                    statusField to true,
-                    "transcript" to ""
-                )
-                meetingRef.set(data)
-            }
+        meetingRef.update(statusField, true).addOnFailureListener {
+            val data = hashMapOf(statusField to true, "transcript" to "")
+            meetingRef.set(data)
+        }
 
         meetingRef.addSnapshotListener { snapshot, e ->
             if (e != null || snapshot == null) return@addSnapshotListener
@@ -155,23 +153,23 @@ class ConsultationActivity : AppCompatActivity() {
             runOnUiThread {
                 updateStatusUI(isDoctorHere, isPatientHere)
                 tvTranscript.text = remoteTranscript
-
                 findViewById<ScrollView>(R.id.scrollTranscript).fullScroll(ScrollView.FOCUS_DOWN)
 
+                // BOTH CONNECTED LOGIC
                 if (isDoctorHere && isPatientHere && !otherPartyJoined) {
                     otherPartyJoined = true
                     stopWaitTimer()
-                    Toast.makeText(this, "Both parties connected!", Toast.LENGTH_SHORT).show()
+                    startDurationTimer() // Start counting duration
+                    Toast.makeText(this, "Session Started", Toast.LENGTH_SHORT).show()
                 }
             }
         }
     }
 
     private fun updateStatusUI(doctorHere: Boolean, patientHere: Boolean) {
-        tvDoctorStatus.text = if (doctorHere) "Joined (Online)" else "Waiting..."
+        tvDoctorStatus.text = if (doctorHere) "Joined" else "Waiting..."
         tvDoctorStatus.setTextColor(if (doctorHere) 0xFF4CAF50.toInt() else 0xFFFFA000.toInt())
-
-        tvPatientStatus.text = if (patientHere) "Joined (Online)" else "Waiting..."
+        tvPatientStatus.text = if (patientHere) "Joined" else "Waiting..."
         tvPatientStatus.setTextColor(if (patientHere) 0xFF4CAF50.toInt() else 0xFFFFA000.toInt())
     }
 
@@ -180,13 +178,11 @@ class ConsultationActivity : AppCompatActivity() {
             override fun onTick(millisUntilFinished: Long) {
                 val min = TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished)
                 val sec = TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) % 60
-                tvTimer.text = String.format("%02d:%02d", min, sec)
+                tvTimer.text = "Waiting: " + String.format("%02d:%02d", min, sec)
             }
-
             override fun onFinish() {
                 if (!otherPartyJoined) {
-                    Toast.makeText(this@ConsultationActivity, "Meeting Cancelled - User absent", Toast.LENGTH_LONG).show()
-                    viewModel.updateAppointmentStatus(appointmentId, AppointmentStatus.CANCELLED)
+                    Toast.makeText(this@ConsultationActivity, "Timed out waiting for other party", Toast.LENGTH_LONG).show()
                     finish()
                 }
             }
@@ -195,74 +191,48 @@ class ConsultationActivity : AppCompatActivity() {
 
     private fun stopWaitTimer() {
         waitTimer?.cancel()
-        tvTimer.text = "LIVE"
-        tvTimer.setTextColor(0xFF4CAF50.toInt())
+        sessionStartTime = System.currentTimeMillis()
+    }
+
+    private fun startDurationTimer() {
+        // Simple UI timer for duration
+        durationTimer = object : CountDownTimer(3600000, 1000) { // Up to 1 hour
+            override fun onTick(millisUntilFinished: Long) {
+                val elapsed = System.currentTimeMillis() - sessionStartTime
+                val min = TimeUnit.MILLISECONDS.toMinutes(elapsed)
+                val sec = TimeUnit.MILLISECONDS.toSeconds(elapsed) % 60
+                tvTimer.text = String.format("%02d:%02d", min, sec)
+                tvTimer.setTextColor(0xFF4CAF50.toInt())
+            }
+            override fun onFinish() {}
+        }.start()
     }
 
     private fun setupVoiceService() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 101)
-            return
-        }
-
-        // FIXED: Explicit type for partial result to satisfy compiler
-        voiceService = VoiceRecognitionService(
-            context = this,
-            onResult = { text ->
-                runOnUiThread {
-                    uploadTranscriptChunk(text)
-                    tvPartialTranscript.text = ""
-
-                    if (fullTranscript.length - lastAiAnalysisLength > 100) {
-                        refreshAiInsights()
-                    }
-                }
-            },
-            onError = { error ->
-                runOnUiThread {
-                    if (!error.contains("detect") && !error.contains("Network")) {
-                        // Suppress minor errors in loop
-                        Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
-            onPartialResult = { partial ->
-                runOnUiThread {
-                    tvPartialTranscript.text = "$partial..."
-                }
-            }
-        )
-
-        voiceService?.startListening(continuous = true)
+        // Voice recording is disabled on the ConsultationActivity waiting screen.
+        // The actual mic transcription runs inside VideoCallActivity alongside Jitsi.
+        // Nothing to set up here.
     }
 
     private fun uploadTranscriptChunk(text: String) {
         val prefix = if (userRole == "DOCTOR") "Dr: " else "Pt: "
         val formattedText = "$prefix$text"
         fullTranscript.append("\n").append(formattedText)
-
-        lifecycleScope.launch {
-            viewModel.addToTranscript(formattedText)
-        }
-
+        lifecycleScope.launch { viewModel.addToTranscript(formattedText) }
         val meetingRef = firestore.collection("appointments").document(appointmentId.toString())
         firestore.runTransaction { transaction ->
             val snapshot = transaction.get(meetingRef)
             val current = snapshot.getString("transcript") ?: ""
-            val newText = "$current\n$formattedText"
-            transaction.update(meetingRef, "transcript", newText)
+            transaction.update(meetingRef, "transcript", "$current\n$formattedText")
         }
     }
 
     private fun refreshAiInsights() {
         val transcript = fullTranscript.toString()
         if (transcript.length < 50) return
-
         btnRefreshInsights.isEnabled = false
         lifecycleScope.launch {
-            // Using aiAssistant if available, or fall back to Repository if you moved logic there
             val insights = aiAssistant?.getLiveInsights(transcript)
-
             runOnUiThread {
                 btnRefreshInsights.isEnabled = true
                 if (insights != null) {
@@ -275,35 +245,25 @@ class ConsultationActivity : AppCompatActivity() {
 
     private fun updateAiInsightsUI(insights: GeminiConversationAssistant.LiveInsights) {
         layoutAiInsights.visibility = View.VISIBLE
-
         tvSeverity.text = insights.severity
-        val severityColor = when (insights.severity) {
-            "LOW" -> 0xFF4CAF50.toInt()
-            "NORMAL" -> 0xFF2196F3.toInt()
-            "HIGH" -> 0xFFFFA000.toInt()
-            "CRITICAL" -> 0xFFF44336.toInt()
-            else -> 0xFF9E9E9E.toInt()
-        }
-        tvSeverity.background.setTint(severityColor)
-
-        tvSymptoms.text = if (insights.detectedSymptoms.isEmpty()) "No symptoms detected yet" else insights.detectedSymptoms.joinToString("\n") { "• $it" }
-
+        tvSymptoms.text = if (insights.detectedSymptoms.isEmpty()) "None" else insights.detectedSymptoms.joinToString("\n") { "• $it" }
         if (insights.redFlags.isNotEmpty()) {
             layoutRedFlags.visibility = View.VISIBLE
             tvRedFlags.text = insights.redFlags.joinToString("\n") { "• $it" }
         } else {
             layoutRedFlags.visibility = View.GONE
         }
-
-        tvQuestions.text = if (insights.suggestedQuestions.isEmpty()) "Ask about symptom duration" else insights.suggestedQuestions.take(3).joinToString("\n") { "• $it" }
-        tvDiagnosis.text = insights.preliminaryDiagnosis.ifBlank { "Assessing..." }
+        tvQuestions.text = insights.suggestedQuestions.take(3).joinToString("\n") { "• $it" }
+        tvDiagnosis.text = insights.preliminaryDiagnosis
     }
 
-
     private fun endMeeting() {
+        if (userRole == "DOCTOR") {
+            // Only doctor can officially "Close" the session logic in DB
+            viewModel.endConsultation(fullTranscript.toString())
+        }
         val statusField = if (userRole == "DOCTOR") "doctorJoined" else "patientJoined"
-        firestore.collection("appointments").document(appointmentId.toString())
-            .update(statusField, false)
+        firestore.collection("appointments").document(appointmentId.toString()).update(statusField, false)
         finish()
     }
 
@@ -311,6 +271,7 @@ class ConsultationActivity : AppCompatActivity() {
         super.onDestroy()
         voiceService?.shutdown()
         waitTimer?.cancel()
+        durationTimer?.cancel()
         endMeeting()
     }
 }

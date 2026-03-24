@@ -41,7 +41,11 @@ class ProfileFragment : Fragment() {
         }
     }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
         val view = inflater.inflate(R.layout.fragment_profile, container, false)
         viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
@@ -84,7 +88,8 @@ class ProfileFragment : Fragment() {
         }
 
         if (userRole == "DOCTOR") {
-            view.findViewById<MaterialCardView>(R.id.cardDoctorProfessional).visibility = View.VISIBLE
+            view.findViewById<MaterialCardView>(R.id.cardDoctorProfessional).visibility =
+                View.VISIBLE
             view.findViewById<MaterialCardView>(R.id.cardBio).visibility = View.VISIBLE
             view.findViewById<MaterialCardView>(R.id.cardPatientMedical).visibility = View.GONE
 
@@ -93,13 +98,25 @@ class ProfileFragment : Fragment() {
                     tvName.text = it.name
                     tvSubtitle.text = it.specialization
                     if (it.profileImageUrl.isNotEmpty()) {
-                        ivProfile.load(it.profileImageUrl) { transformations(CircleCropTransformation()) }
+                        ivProfile.load(it.profileImageUrl) {
+                            transformations(CircleCropTransformation())
+                        }
                     }
                     setRow(R.id.rowEmail, R.drawable.ic_email, "Email", it.email)
                     setRow(R.id.rowPhone, R.drawable.ic_phone, "Phone", it.phone)
                     setRow(R.id.rowHospital, R.drawable.ic_hospital, "Hospital", it.hospitalName)
-                    setRow(R.id.rowExperience, R.drawable.ic_calendar, "Experience", "${it.experienceYears} Years")
-                    setRow(R.id.rowFee, R.drawable.ic_features, "Consultation Fee", "₹${it.consultationFee}")
+                    setRow(
+                        R.id.rowExperience,
+                        R.drawable.ic_calendar,
+                        "Experience",
+                        "${it.experienceYears} Years"
+                    )
+                    setRow(
+                        R.id.rowFee,
+                        R.drawable.ic_features,
+                        "Consultation Fee",
+                        "₹${it.consultationFee}"
+                    )
                 }
             }
         } else {
@@ -112,7 +129,9 @@ class ProfileFragment : Fragment() {
                     tvName.text = it.name
                     tvSubtitle.text = "Patient"
                     if (it.profileImageUrl.isNotEmpty()) {
-                        ivProfile.load(it.profileImageUrl) { transformations(CircleCropTransformation()) }
+                        ivProfile.load(it.profileImageUrl) {
+                            transformations(CircleCropTransformation())
+                        }
                     }
                     setRow(R.id.rowEmail, R.drawable.ic_email, "Email", it.email)
                     setRow(R.id.rowPhone, R.drawable.ic_phone, "Phone", it.phone)
@@ -121,6 +140,28 @@ class ProfileFragment : Fragment() {
                     view.findViewById<TextView>(R.id.blockAge).text = "${it.age}\nYears"
                     view.findViewById<TextView>(R.id.blockBlood).text = "${it.bloodGroup}\nBlood"
                     view.findViewById<TextView>(R.id.blockGender).text = "${it.gender}\nGender"
+
+                    // --- ADDED: Display Allergies and Chronic Conditions ---
+                    val allergiesText =
+                        if (it.allergies.isNotEmpty()) it.allergies.joinToString(", ")
+                        else "None"
+                    view.findViewById<TextView>(R.id.tvAllergies).text = allergiesText
+
+                    val conditionsText =
+                        if (it.chronicConditions.isNotEmpty())
+                            it.chronicConditions.joinToString(", ")
+                        else "None"
+                    view.findViewById<TextView>(R.id.tvConditions).text = conditionsText
+                    // -----------------------------------------------------
+
+                    view.findViewById<View>(R.id.btnMedicalReports).setOnClickListener { _ ->
+                        val fragment = MedicalReportsFragment.newInstance(userId)
+                        parentFragmentManager
+                            .beginTransaction()
+                            .replace(R.id.fragment_container_patient, fragment)
+                            .addToBackStack(null)
+                            .commit()
+                    }
                 }
             }
         }

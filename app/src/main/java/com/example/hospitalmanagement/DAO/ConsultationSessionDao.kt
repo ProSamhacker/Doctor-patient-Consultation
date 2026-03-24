@@ -2,6 +2,7 @@ package com.example.hospitalmanagement.DAO
 import androidx.room.*
 import com.example.hospitalmanagement.ConsultationSession
 import kotlinx.coroutines.flow.Flow
+
 @Dao
 interface ConsultationSessionDao {
     @Insert
@@ -21,4 +22,7 @@ interface ConsultationSessionDao {
 
     @Query("SELECT * FROM consultation_sessions WHERE appId = :appId AND isRecording = 1")
     suspend fun getActiveSession(appId: Int): ConsultationSession?
+
+    @Query("UPDATE consultation_sessions SET fullTranscript = :transcript WHERE sessionId = :sessionId")
+    suspend fun updateTranscript(sessionId: Int, transcript: String)
 }

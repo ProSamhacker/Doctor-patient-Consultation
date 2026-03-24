@@ -193,6 +193,16 @@
             app:tint="#FFFFFF" />
 
         <ImageButton
+            android:id="@+id/btnVideoCall"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="32dp"
+            android:background="@drawable/circle_background"
+            android:backgroundTint="#2196F3"
+            android:src="@android:drawable/ic_menu_camera"
+            app:tint="#FFFFFF" />
+
+        <ImageButton
             android:id="@+id/btnEndCall"
             android:layout_width="60dp"
             android:layout_height="60dp"

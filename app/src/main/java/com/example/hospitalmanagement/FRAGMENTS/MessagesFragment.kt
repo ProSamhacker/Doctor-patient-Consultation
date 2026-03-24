@@ -85,7 +85,6 @@
             progressBar.visibility = View.VISIBLE
             layoutEmptyState.visibility = View.GONE
 
-            // Using observe on LiveData
             viewModel.allAppointments.observe(viewLifecycleOwner) { appointments ->
                 if (appointments.isEmpty()) {
                     progressBar.visibility = View.GONE
@@ -94,70 +93,63 @@
                     return@observe
                 }
 
-                // Launch a coroutine to fetch details (Doctor/Patient names) and Messages
                 lifecycleScope.launch {
                     val conversations = mutableListOf<ConversationItem>()
                     var totalUnread = 0
 
-                    // Group appointments by unique user pair (deduplicate)
                     val groupedByUser = mutableMapOf<String, Appointment>()
-
-                    // Sort by most recent first to keep the latest appointment per user
                     for (appt in appointments.sortedByDescending { it.createdAt }) {
-                        // Only show appointments that are scheduled or completed
                         if (appt.status == AppointmentStatus.CANCELLED) continue
-
-                        // Determine the other user's ID
                         val otherUserId = if (userRole == "DOCTOR") appt.patientId else appt.doctorId
-
-                        // Keep only the most recent appointment per unique user
                         if (!groupedByUser.containsKey(otherUserId)) {
                             groupedByUser[otherUserId] = appt
                         }
                     }
 
-                    // Now process only unique user conversations
                     for ((_, appt) in groupedByUser) {
-                        // 1. Fetch Missing Details manually (because we only have IDs)
                         val patient = viewModel.repository.getPatient(appt.patientId)
-                        val doctor = viewModel.repository.getDoctor(appt.doctorId)
-
-                        // Skip if data is inconsistent/missing
+                        val doctor  = viewModel.repository.getDoctor(appt.doctorId)
                         if (patient == null || doctor == null) continue
 
-                        // 2. Fetch Messages
-                        val messages = viewModel.repository.getAppointmentMessages(appt.appId).first()
-                        val lastMessage = messages.lastOrNull()
+                        // ── Fetch last message from Firestore (single query) ──
+                        val (lastMsgContent, lastMsgTime) = kotlin.coroutines.suspendCoroutine<Pair<String?, Long?>> { cont ->
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                .collection("appointments")
+                                .document(appt.appId.toString())
+                                .collection("messages")
+                                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                                .limit(1)
+                                .get()
+                                .addOnSuccessListener { snap ->
+                                    val doc = snap.documents.firstOrNull()
+                                    cont.resumeWith(Result.success(
+                                        Pair(doc?.getString("content"), doc?.getLong("timestamp"))
+                                    ))
+                                }
+                                .addOnFailureListener { cont.resumeWith(Result.success(Pair(null, null))) }
+                        }
 
-                        // 3. Get Unread Count
-                        val unreadCount =
-                            viewModel.repository.getUnreadMessageCount(appt.appId, userId).first()
+                        val unreadCount = viewModel.repository.getUnreadMessageCount(appt.appId, userId).first()
                         totalUnread += unreadCount
 
-                        // 4. Determine Other Party Name/Role
                         val (otherPartyName, otherPartyRole) =
-                            if (userRole == "DOCTOR") {
-                                Pair(patient.name, "Patient")
-                            } else {
-                                Pair(doctor.name, doctor.specialization)
-                            }
+                            if (userRole == "DOCTOR") Pair(patient.name, "Patient")
+                            else Pair(doctor.name, doctor.specialization)
 
                         conversations.add(
                             ConversationItem(
-                                appointment = appt, // Now correctly passing Appointment
-                                lastMessage = lastMessage?.content ?: "No messages yet",
-                                lastMessageTime = lastMessage?.timestamp ?: appt.createdAt,
-                                unreadCount = unreadCount,
-                                otherPartyName = otherPartyName,
-                                otherPartyRole = otherPartyRole
+                                appointment     = appt,
+                                lastMessage     = lastMsgContent ?: "No messages yet",
+                                lastMessageTime = lastMsgTime ?: appt.createdAt,
+                                unreadCount     = unreadCount,
+                                otherPartyName  = otherPartyName,
+                                otherPartyRole  = otherPartyRole
                             )
                         )
                     }
 
-                    // Sort by last message time
                     conversations.sortByDescending { it.lastMessageTime }
 
-                    // Update UI
                     progressBar.visibility = View.GONE
                     if (conversations.isEmpty()) {
                         layoutEmptyState.visibility = View.VISIBLE
@@ -168,7 +160,6 @@
                         conversationAdapter.updateData(conversations)
                     }
 
-                    // Update total unread badge
                     if (totalUnread > 0) {
                         tvTotalUnread.visibility = View.VISIBLE
                         tvTotalUnread.text = if (totalUnread > 99) "99+" else totalUnread.toString()

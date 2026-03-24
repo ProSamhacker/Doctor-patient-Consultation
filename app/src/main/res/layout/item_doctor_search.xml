@@ -34,18 +34,18 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Dr. Amit Kumar"
+                android:textColor="#FFFFFF"
                 android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="#333333"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvSpecialization"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:text="Cardiologist"
-                android:textSize="14sp"
-                android:textColor="#666666"
-                android:layout_marginTop="2dp"/>
+                android:textColor="#0098FF"
+                android:textSize="14sp" />
 
             <TextView
                 android:id="@+id/tvHospital"

@@ -84,6 +84,32 @@
                 android:layout_marginEnd="8dp"/>
 
             <Button
+                android:id="@+id/btnViewProfile"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="View Profile"
+                android:textSize="13sp"
+                android:textColor="#9C27B0"
+                android:drawableStart="@drawable/ic_profile"
+                android:drawableTint="#9C27B0"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btnReject"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Reject"
+                android:textSize="13sp"
+                android:textColor="#F44336"
+                android:drawableStart="@drawable/ic_close"
+                android:drawableTint="#F44336"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone"/>
+
+            <Button
                 android:id="@+id/btnPrescribe"
                 style="@style/Widget.Material3.Button"
                 android:layout_width="wrap_content"
@@ -95,12 +121,17 @@
                 android:layout_marginEnd="8dp"/>
 
             <Button
-                android:id="@+id/btnView"
-                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/btnVitals"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="View"
-                android:textSize="13sp"/>
+                android:text="Vitals"
+                android:textSize="13sp"
+                android:drawableStart="@drawable/ic_features"
+                android:drawableTint="#FF9800"
+                android:layout_marginEnd="8dp"/>
+
+
         </LinearLayout>
     </LinearLayout>
 </androidx.cardview.widget.CardView>
